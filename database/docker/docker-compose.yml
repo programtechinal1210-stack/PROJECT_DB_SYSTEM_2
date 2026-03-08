@@ -1,0 +1,52 @@
+﻿services:
+  postgres:
+    image: postgis/postgis:15-3.4
+    container_name: project_db
+    environment:
+      POSTGRES_DB: project_db_system
+      POSTGRES_USER: project_user
+      POSTGRES_PASSWORD: Project@123456
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      TZ: Asia/Riyadh
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../database/bootstrap:/docker-entrypoint-initdb.d
+      - ../../database/backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U project_user -d project_db_system"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: project_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@project.com
+      PGADMIN_DEFAULT_PASSWORD: Admin@123
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: project_redis
+    command: redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  redis_data:

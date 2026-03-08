@@ -1,0 +1,28 @@
+ 
+{
+  "name": "@project/core-abstractions",
+  "version": "1.0.0",
+  "description": "Core abstractions and interfaces for the project",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ddd",
+    "domain",
+    "abstractions"
+  ],
+  "author": "PROJECT_DB_SYSTEM",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

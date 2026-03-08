@@ -1,0 +1,14 @@
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.csproj.AssemblyReference.cache
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.GeneratedMSBuildEditorConfig.editorconfig
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.AssemblyInfoInputs.cache
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.AssemblyInfo.cs
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.csproj.CoreCompileInputs.cache
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\bin\Debug\net8.0\Core.Module.deps.json
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\bin\Debug\net8.0\Core.Module.runtimeconfig.json
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\bin\Debug\net8.0\Core.Module.dll
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\bin\Debug\net8.0\Core.Module.pdb
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.dll
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\refint\Core.Module.dll
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.pdb
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\Core.Module.genruntimeconfig.cache
+E:\PROJECT_DB_SYSTEM_2\backend\Modules\01-Core.Module\obj\Debug\net8.0\ref\Core.Module.dll
