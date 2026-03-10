@@ -1,0 +1,617 @@
+📊 التقرير الشامل والوثيقة الكاملة لقاعدة البيانات
+
+Project DB System - Database Documentation
+
+الإصدار: 1.0.0 | التاريخ: 2026-03-07
+
+---
+
+📑 فهرس المحتويات
+
+1. نظرة عامة على النظام
+2. الهيكل العام للمشروع
+3. تصميم قاعدة البيانات
+4. تفاصيل الـ Modules
+5. الأمان والصلاحيات
+6. التدقيق والتتبع
+7. سكريبتات التشغيل والصيانة
+8. دليل التشغيل السريع
+9. استكشاف الأخطاء وحلولها
+10. المراجع والإصدارات
+
+---
+
+🎯 نظرة عامة على النظام
+
+1.1 الغرض من النظام
+
+نظام متكامل لإدارة المشاريع والموارد البشرية والأصول، مصمم بمعمارية Clean Architecture مع دعم كامل للغتين العربية والإنجليزية.
+
+1.2 المكونات الرئيسية
+
+· Backend: .NET 8 مع Clean Architecture
+· Frontend: React مع TypeScript
+· Database: PostgreSQL 15 + PostGIS
+· Cache: Redis
+· Container: Docker & Docker Compose
+
+1.3 أهداف التصميم
+
+· ✅ المرونة: سهولة إضافة وحدات جديدة
+· ✅ الأداء: فهارس محسنة واستعلامات فعالة
+· ✅ الأمان: RLS + تشفير + تدقيق كامل
+· ✅ قابلية التوسع: دعم مئات الآلاف من السجلات
+· ✅ التوافق: دعم كامل للغة العربية
+
+---
+
+📂 الهيكل العام للمشروع
+
+```
+E:\PROJECT_DB_SYSTEM_2\
+│
+├───📁 database/                           # 🗄️ قاعدة البيانات
+│   ├───📁 bootstrap/                       # تهيئة البنية التحتية
+│   ├───📁 security/                         # طبقة الأمان
+│   ├───📁 migrations/                        # تتبع التغييرات
+│   ├───📁 seeds/                             # البيانات الأولية
+│   ├───📁 structure/                          # هيكل قاعدة البيانات النهائي
+│   ├───📁 audit/                              # التدقيق المركزي
+│   ├───📁 scripts/                            # سكريبتات مساعدة
+│   └───📁 docker/                              # ملفات Docker
+│
+├───📁 backend/                             # 🖥️ الخادم الخلفي
+│   ├───📁 BE.API/                           # API Gateway
+│   └───📁 Modules/                           # وحدات النظام
+│
+├───📁 frontend/                            # 🎨 الواجهة الأمامية
+└───📁 infrastructure/                       # 🏗️ بنية تحتية
+    └───📁 docker/                           # Docker Compose
+```
+
+---
+
+🏛️ تصميم قاعدة البيانات
+
+3.1 ملخص الإحصائيات
+
+الوحدة عدد الجداول عدد الـ Views عدد الدوال عدد الـ Triggers
+Core 12 5 9 3
+Organization 11 4 7 3
+HR 17 4 7 3
+Assets 16 4 6 4
+Field 15 5 7 4
+Audit 3 0 5 0
+الإجمالي 74 22 41 17
+
+3.2 هيكل الـ Schemas
+
+```sql
+-- الـ Schemas الأساسية
+core          # 🔐 المصادقة والصلاحيات
+organization  # 🏢 الهيكل التنظيمي (فروع، إدارات، أقسام)
+hr            # 👥 الموارد البشرية (موظفين، حضور، تدريب)
+assets        # 🔧 الأصول والمعدات (آلات، أدوات، موارد)
+field         # 🗺️ المواقع الميدانية (مواقع، منشآت، مهام)
+audit         # 📝 التدقيق المركزي
+```
+
+3.3 العلاقات بين الـ Modules
+
+```mermaid
+graph TD
+    Core --> Organization
+    Core --> HR
+    Core --> Assets
+    Core --> Field
+    Organization --> HR
+    Organization --> Assets
+    Organization --> Field
+    HR --> Assets
+    HR --> Field
+    Assets --> Field
+    Audit -.->|يتتبع| Core
+    Audit -.->|يتتبع| Organization
+    Audit -.->|يتتبع| HR
+    Audit -.->|يتتبع| Assets
+    Audit -.->|يتتبع| Field
+```
+
+---
+
+📦 تفاصيل الـ Modules
+
+4.1 Core Module - 🔐 المصادقة والصلاحيات
+
+الغرض: إدارة المستخدمين والأدوار والصلاحيات
+
+الجداول الرئيسية:
+
+الجدول الوصف عدد الحقول
+users بيانات المستخدمين 20
+roles أدوار النظام 9
+permissions الصلاحيات 8
+app_modules وحدات التطبيق 11
+user_roles ربط المستخدمين بالأدوار 5
+role_permissions ربط الأدوار بالصلاحيات 5
+user_sessions جلسات المستخدمين 10
+login_attempts محاولات تسجيل الدخول 5
+password_resets إعادة تعيين كلمة المرور 7
+
+الأنواع المخصصة (ENUMs):
+
+· user_status: 'active', 'inactive', 'locked', 'pending'
+· auth_provider: 'local', 'google', 'microsoft', 'ldap'
+
+أهم الدوال:
+
+· fn_validate_email(): التحقق من صحة الإيميل
+· fn_validate_password(): التحقق من قوة كلمة المرور
+· fn_hash_password(): تشفير كلمة المرور
+· fn_verify_password(): التحقق من كلمة المرور
+
+الفهارس المحسنة:
+
+· idx_users_username: بحث سريع عن المستخدمين النشطين
+· idx_users_email: بحث بالإيميل
+· idx_user_sessions_token: بحث برمز الجلسة
+
+---
+
+4.2 Organization Module - 🏢 الهيكل التنظيمي
+
+الغرض: إدارة الفروع والإدارات والأقسام والهيكل الهرمي
+
+الجداول الرئيسية:
+
+الجدول الوصف عدد الحقول
+branches الفروع 19
+branch_closure Closure Table للهيكل الهرمي 3
+departments الإدارات 7
+sections الأقسام 7
+branch_departments ربط الفروع بالإدارات 6
+branch_dept_sections ربط الفروع-الإدارات بالأقسام 6
+branch_types أنواع الفروع (lookup) 5
+operational_statuses حالات التشغيل (lookup) 4
+
+الأنواع المخصصة (ENUMs):
+
+· branch_type: 'M1', 'M', 'S', 'F'
+· operational_status: 'ready', 'active', 'standby', 'maintenance'
+
+أهم الدوال:
+
+· fn_add_branch(): إضافة فرع جديد مع تحديث Closure Table
+· fn_get_branch_path(): الحصول على المسار الكامل للفرع
+· fn_get_descendants(): الحصول على جميع الفروع التابعة
+· fn_get_ancestors(): الحصول على جميع الفروع الأب
+· fn_move_branch(): نقل فرع إلى أب جديد
+
+الفهارس المحسنة:
+
+· idx_branches_parent: بحث بالفرع الأب
+· idx_branches_level: بحث بمستوى الفرع
+· idx_closure_ancestor: فهارس Closure Table
+
+---
+
+4.3 HR Module - 👥 الموارد البشرية
+
+الغرض: إدارة الموظفين والحضور والتدريب والمؤهلات
+
+الجداول الرئيسية:
+
+الجدول الوصف عدد الحقول
+employees الموظفين 26
+employee_assignments تكليفات الموظفين 10
+qualifications المؤهلات 8
+training_courses الدورات التدريبية 9
+reading_levels مستويات القراءة 7
+job_levels المستويات الوظيفية 8
+admin_specialties التخصصات الإدارية 8
+employee_qualifications مؤهلات الموظفين 10
+employee_training تدريب الموظفين 10
+employee_specialties تخصصات الموظفين 8
+employee_job_levels المستويات الوظيفية للموظفين 8
+employee_reading_levels مستويات القراءة للموظفين 9
+attendance الحضور 8
+attendance_archive أرشيف الحضور 9
+
+الأنواع المخصصة (ENUMs):
+
+· attendance_status: 'present', 'absent', 'vacation', 'sick', 'late', 'permission'
+· training_status: 'enrolled', 'completed', 'failed', 'withdrawn'
+· employee_status: 'active', 'vacation', 'sick', 'terminated', 'retired'
+
+أهم الدوال:
+
+· fn_calculate_attendance_hours(): حساب ساعات الحضور
+· fn_check_attendance_conflict(): التحقق من تعارض الحضور
+· fn_archive_old_attendance(): أرشفة الحضور القديم
+· fn_get_employee_current_assignment(): الحصول على التكليف الحالي
+· fn_validate_national_id(): التحقق من صحة رقم الهوية
+
+الفهارس المحسنة:
+
+· idx_employees_code: بحث بكود الموظف
+· idx_employees_national_id: بحث برقم الهوية
+· idx_attendance_employee_date: بحث بالحضور
+· idx_emp_assignments_dates: بحث بتواريخ التكليف
+
+---
+
+4.4 Assets Module - 🔧 الأصول والمعدات
+
+الغرض: إدارة الآلات والأدوات والموارد والصيانة
+
+الجداول الرئيسية:
+
+الجدول الوصف عدد الحقول
+machines الآلات 21
+tools الأدوات 15
+resources الموارد 13
+machine_types أنواع الآلات 8
+resource_types أنواع الموارد 7
+device_types أنواع الأجهزة 7
+machine_resources موارد الآلات 8
+machine_assignments تكليفات الآلات 9
+tool_assignments تكليفات الأدوات 10
+objectives الأهداف 10
+machine_objectives أهداف الآلات 7
+device_type_required_equipments المعدات المطلوبة للأجهزة 8
+communication_devices أجهزة الاتصال 15
+actual_device_equipments المعدات الفعلية للأجهزة 7
+maintenance_records سجلات الصيانة 9
+
+الأنواع المخصصة (ENUMs):
+
+· machine_status: 'active', 'inactive', 'stored', 'maintenance', 'reserved', 'transferred', 'scrapped'
+· tool_status: 'available', 'in_use', 'maintenance', 'lost', 'damaged'
+· equipment_condition: 'good', 'damaged', 'missing'
+
+أهم الدوال:
+
+· fn_calculate_next_maintenance(): حساب تاريخ الصيانة القادم
+· fn_check_maintenance_due(): التحقق من الآلات المستحقة للصيانة
+· fn_check_tool_availability(): التحقق من توفر الأداة
+· fn_get_machine_resources(): الحصول على موارد الآلة
+· fn_validate_serial_number(): التحقق من صحة الرقم التسلسلي
+
+الفهارس المحسنة:
+
+· idx_machines_code: بحث بكود الآلة
+· idx_machines_serial: بحث بالرقم التسلسلي
+· idx_machines_next_maintenance: بحث بموعد الصيانة
+· idx_tools_available: بحث بالأدوات المتاحة
+
+---
+
+4.5 Field Module - 🗺️ المواقع الميدانية
+
+الغرض: إدارة المواقع الجيولوجية والمنشآت والمهام الميدانية
+
+الجداول الرئيسية:
+
+الجدول الوصف عدد الحقول
+locations المواقع 24
+geological_sites المواقع الجيولوجية 14
+exploration_materials مواد الاستكشاف 15
+facility_types أنواع المنشآت 8
+facility_properties خصائص المنشآت 10
+location_facilities منشآت المواقع 15
+facility_property_values قيم خصائص المنشآت 8
+tasks المهام 17
+task_assignments تكليفات المهام 11
+task_dependencies تبعيات المهام 6
+task_comments تعليقات المهام 7
+site_types أنواع المواقع (lookup) 5
+terrain_types أنواع التضاريس (lookup) 4
+exploration_phases مراحل الاستكشاف (lookup) 5
+
+الأنواع المخصصة (ENUMs):
+
+· site_type: 'drilling', 'sampling', 'camp', 'warehouse', 'exploration', 'production', 'laboratory', 'office', 'helipad', 'storage', 'maintenance', 'quarters'
+· terrain_type: 'mountainous', 'coastal', 'desert', 'urban', 'rural', 'forest', 'plain', 'valley', 'plateau', 'volcanic', 'wetland', 'arctic'
+· exploration_phase: 'initial', 'reconnaissance', 'geophysical', 'geochemical', 'exploratory', 'detailed', 'feasibility', 'development', 'production', 'closure', 'rehabilitation'
+· location_status: 'safe', 'contested', 'dangerous', 'unstable', 'restricted', 'closed'
+· task_status: 'scheduled', 'in_progress', 'completed', 'cancelled', 'on_hold', 'failed'
+· task_priority: 'low', 'medium', 'high', 'critical'
+
+أهم الدوال:
+
+· fn_calculate_distance(): حساب المسافة بين موقعين
+· fn_get_sites_in_radius(): البحث عن المواقع ضمن نصف قطر
+· fn_validate_coordinates(): التحقق من صحة الإحداثيات
+· fn_check_location_capacity(): التحقق من سعة الموقع
+· fn_check_task_dates(): التحقق من صحة تواريخ المهمة
+
+الفهارس المحسنة:
+
+· idx_locations_coordinates: فهرس مكاني (GIS)
+· idx_locations_code: بحث بكود الموقع
+· idx_tasks_status: بحث بحالة المهمة
+· idx_tasks_dates: بحث بتواريخ المهمة
+
+---
+
+🔐 الأمان والصلاحيات
+
+5.1 Row Level Security (RLS)
+
+```sql
+-- تفعيل RLS على الجداول الحساسة
+ALTER TABLE core.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE core.user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE core.audit_log ENABLE ROW LEVEL SECURITY;
+
+-- سياسات للمستخدمين
+CREATE POLICY users_view_own ON core.users 
+    FOR SELECT USING (current_user = username OR current_user = 'app_admin');
+```
+
+5.2 الأدوار على مستوى قاعدة البيانات
+
+الدور الصلاحيات
+app_admin جميع الصلاحيات على جميع الجداول
+app_data_entry إدخال وتحديث البيانات في HR, Assets, Field
+app_viewer عرض فقط على جميع الجداول
+app_service صلاحيات محدودة للخدمات الخلفية
+
+5.3 تشفير البيانات الحساسة
+
+```sql
+-- تشفير كلمة المرور
+password_hash VARCHAR(255) NOT NULL -- مشفر باستخدام bcrypt
+
+-- تشفير البيانات الحساسة
+CREATE OR REPLACE FUNCTION core.encrypt_sensitive_data(
+    p_data TEXT,
+    p_key_name VARCHAR DEFAULT 'master_key'
+) RETURNS TEXT;
+```
+
+---
+
+📝 التدقيق والتتبع (Audit)
+
+6.1 نظام التدقيق المركزي
+
+```sql
+-- جدول سجل التدقيق
+CREATE TABLE audit.audit_log (
+    audit_id BIGSERIAL PRIMARY KEY,
+    schema_name VARCHAR(100) NOT NULL,
+    table_name VARCHAR(100) NOT NULL,
+    record_id BIGINT NOT NULL,
+    operation VARCHAR(10) NOT NULL,
+    old_data JSONB,
+    new_data JSONB,
+    changed_by VARCHAR(100),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address INET,
+    transaction_id VARCHAR(100)
+);
+```
+
+6.2 تكوين التدقيق
+
+```sql
+-- تحديد الجداول المراد تدقيقها
+INSERT INTO audit.audit_config (schema_name, table_name, is_audited) VALUES
+('core', 'users', true),
+('hr', 'employees', true),
+('assets', 'machines', true),
+('field', 'locations', true);
+```
+
+6.3 دوال التدقيق المهمة
+
+· audit.get_audit_trail(): الحصول على سجل تغييرات كائن معين
+· audit.get_user_audit_trail(): الحصول على سجل تغييرات مستخدم
+· audit.cleanup_old_audit_logs(): تنظيف السجلات القديمة
+· audit.get_audit_statistics(): إحصائيات التدقيق
+· audit.export_audit_logs(): تصدير سجلات التدقيق
+
+---
+
+🛠️ سكريبتات التشغيل والصيانة
+
+7.1 سكريبتات Docker
+
+الملف الغرض
+docker-compose.yml تشغيل PostgreSQL + pgAdmin + Redis
+Dockerfile بناء صورة PostgreSQL مخصصة مع PostGIS
+.env متغيرات البيئة
+healthcheck.sql فحص صحة قاعدة البيانات
+
+7.2 سكريبتات PowerShell
+
+الملف الغرض
+run-database.ps1 تشغيل وإدارة قاعدة البيانات (start, stop, reset, status)
+initialize-database.ps1 تهيئة قاعدة البيانات بالكامل
+backup-database.ps1 إنشاء نسخة احتياطية مع ضغط
+restore-database.ps1 استعادة قاعدة البيانات من نسخة احتياطية
+generate-audit-report.ps1 إنشاء تقارير التدقيق (HTML, CSV, JSON)
+clear-database.sql تنظيف قاعدة البيانات بشكل آمن
+
+7.3 سكريبتات SQL
+
+الملف الغرض
+bootstrap/*.sql تهيئة البنية التحتية (database, schemas, roles, extensions)
+security/*.sql إعدادات الأمان (RLS, grants, encryption)
+migrations/*.sql ترحيلات قاعدة البيانات
+seeds/*.sql البيانات الأولية (users, roles, permissions)
+
+---
+
+🚀 دليل التشغيل السريع
+
+8.1 المتطلبات الأساسية
+
+· Docker Desktop (الإصدار 20.10 أو أحدث)
+· PowerShell 5.1 أو أحدث
+· مساحة تخزين: 5GB على الأقل
+· ذاكرة عشوائية: 4GB على الأقل
+
+8.2 خطوات التشغيل
+
+الخطوة 1: تشغيل الحاويات
+
+```powershell
+cd E:\PROJECT_DB_SYSTEM_2\infrastructure\docker
+docker-compose up -d
+```
+
+الخطوة 2: التحقق من التشغيل
+
+```powershell
+docker ps
+# يجب أن ترى: project_db_postgres, project_db_redis, project_pgadmin
+```
+
+الخطوة 3: تهيئة قاعدة البيانات
+
+```powershell
+cd E:\PROJECT_DB_SYSTEM_2\database\scripts
+.\initialize-database.ps1
+```
+
+الخطوة 4: التحقق من النتيجة
+
+```powershell
+docker exec -it project_db_postgres psql -U project_user -d project_db_system -c "\dn"
+# يجب أن ترى: core, organization, hr, assets, field, audit
+```
+
+8.3 معلومات الاتصال
+
+الخدمة الرابط اسم المستخدم كلمة المرور
+PostgreSQL localhost:5432 project_user Project@123456
+pgAdmin http://localhost:5050 admin@project.com Admin@123
+Redis localhost:6379 - Redis@123456
+
+8.4 أوامر سريعة
+
+```powershell
+# تشغيل قاعدة البيانات
+.\run-database.ps1 start
+
+# إيقاف قاعدة البيانات
+.\run-database.ps1 stop
+
+# حالة قاعدة البيانات
+.\run-database.ps1 status
+
+# إعادة تعيين قاعدة البيانات (حذف كل شيء)
+.\run-database.ps1 reset
+
+# إنشاء نسخة احتياطية
+.\run-database.ps1 backup
+
+# الدخول إلى psql
+docker exec -it project_db_postgres psql -U project_user -d project_db_system
+```
+
+---
+
+🔧 استكشاف الأخطاء وحلولها
+
+9.1 مشاكل شائعة وحلولها
+
+المشكلة السبب الحل
+port is already allocated المنفذ 5432 مستخدم غيّر المنفذ في docker-compose.yml
+role "project_user" does not exist المستخدم غير موجود شغل bootstrap/03-create-roles.sql
+permission denied for schema صلاحيات غير كافية شغل security/02-grants-permissions.sql
+relation does not exist الجداول غير موجودة شغل ملفات migrations/
+could not connect to server الحاوية متوقفة شغل docker-compose up -d
+
+9.2 حل مشاكل الترميز
+
+```powershell
+# مشكلة الأحرف العربية
+$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding
+
+# تشغيل PowerShell مع دعم UTF8
+powershell -NoExit -Command "chcp 65001"
+```
+
+9.3 حل مشكلة سياسة التنفيذ
+
+```powershell
+# تمكين تشغيل السكريبتات
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+```
+
+9.4 استعادة قاعدة البيانات من نسخة احتياطية
+
+```powershell
+# استعادة نسخة احتياطية
+.\restore-database.ps1 -BackupFile "E:\PROJECT_DB_SYSTEM_2\database\backups\backup_20260307.zip"
+```
+
+---
+
+📚 المراجع والإصدارات
+
+10.1 تاريخ الإصدارات
+
+الإصدار التاريخ التغييرات
+1.0.0 2026-03-07 الإصدار الأول - الهيكل الكامل لقاعدة البيانات
+
+10.2 التقنيات المستخدمة
+
+· PostgreSQL 15: قاعدة البيانات الرئيسية
+· PostGIS 3.4: للإمكانيات المكانية
+· pgcrypto: للتشفير
+· uuid-ossp: لتوليد UUID
+· pg_stat_statements: لتحليل الأداء
+
+10.3 أفضل الممارسات المطبقة
+
+· ✅ Normalization: حتى الشكل الثالث (3NF)
+· ✅ Indexing: فهارس محسنة لجميع الاستعلامات
+· ✅ Constraints: قيود على مستوى قاعدة البيانات
+· ✅ Foreign Keys: علاقات قوية بين الجداول
+· ✅ Audit Trail: تتبع جميع التغييرات
+· ✅ Row Level Security: أمان على مستوى الصف
+· ✅ Soft Delete: حذف منطقي للبيانات الحساسة
+· ✅ Versioning: تتبع إصدارات السجلات
+
+10.4 روابط مفيدة
+
+· PostgreSQL Documentation
+· PostGIS Documentation
+· Docker Documentation
+· pgAdmin Documentation
+
+---
+
+✅ خاتمة
+
+تم الانتهاء من تصميم وتوثيق قاعدة البيانات Project DB System بشكل كامل. النظام مبني بمعمارية نظيفة وقابلة للتوسع، مع الالتزام بأفضل الممارسات في تصميم قواعد البيانات.
+
+الإحصائيات النهائية:
+
+المؤشر القيمة
+إجمالي الجداول 74
+إجمالي الـ Views 22
+إجمالي الدوال 41
+إجمالي الـ Triggers 17
+إجمالي الـ Schemas 6
+حجم قاعدة البيانات المتوقع 1-5 GB
+السعة القصوى المتوقعة 1,000,000+ سجل
+
+الجاهزية للتشغيل:
+
+✅ قاعدة البيانات جاهزة للتشغيل الفوري
+✅ جميع ملفات SQL مكتوبة وجاهزة
+✅ سكريبتات Docker للتشغيل السريع
+✅ نظام تدقيق كامل
+✅ أمان متعدد الطبقات
+
+تاريخ التقرير: 2026-03-07
+إعداد: Project DB System Team
+
+---
+
+"قاعدة بيانات مصممة بعناية، جاهزة للتوسع، وآمنة للتشغيل" 🚀
