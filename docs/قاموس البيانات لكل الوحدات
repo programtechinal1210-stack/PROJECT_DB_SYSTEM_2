@@ -1,0 +1,2053 @@
+📚 قاموس بيانات شامل - Data Dictionary
+
+Project DB System - وثيقة مرجعية كاملة
+
+الإصدار: 1.0.0 | التاريخ: 2026-03-10
+
+---
+
+📑 فهرس الوحدات
+
+1. Core Module - 🔐 وحدة المصادقة والصلاحيات
+   · 1.1 الأنواع المخصصة (ENUMs)
+   · 1.2 جداول الوحدة
+   · 1.3 العروض (Views)
+   · 1.4 الدوال (Functions)
+   · 1.5 الارتباطات مع الوحدات الأخرى
+2. Organization Module - 🏢 وحدة الهيكل التنظيمي
+   · 2.1 الأنواع المخصصة (ENUMs)
+   · 2.2 جداول الوحدة
+   · 2.3 العروض (Views)
+   · 2.4 الدوال (Functions)
+   · 2.5 الارتباطات مع الوحدات الأخرى
+3. HR Module - 👥 وحدة الموارد البشرية
+   · 3.1 الأنواع المخصصة (ENUMs)
+   · 3.2 جداول الوحدة
+   · 3.3 العروض (Views)
+   · 3.4 الدوال (Functions)
+   · 3.5 الارتباطات مع الوحدات الأخرى
+4. Assets Module - 🔧 وحدة الأصول والمعدات
+   · 4.1 الأنواع المخصصة (ENUMs)
+   · 4.2 جداول الوحدة
+   · 4.3 العروض (Views)
+   · 4.4 الدوال (Functions)
+   · 4.5 الارتباطات مع الوحدات الأخرى
+5. Field Module - 🗺️ وحدة المواقع الميدانية
+   · 5.1 الأنواع المخصصة (ENUMs)
+   · 5.2 جداول الوحدة
+   · 5.3 العروض (Views)
+   · 5.4 الدوال (Functions)
+   · 5.5 الارتباطات مع الوحدات الأخرى
+6. Audit Module - 📝 وحدة التدقيق المركزي
+   · 6.1 جداول الوحدة
+   · 6.2 الدوال (Functions)
+
+---
+
+🔐 Core Module - وحدة المصادقة والصلاحيات
+
+1.1 الأنواع المخصصة (ENUMs) - Core Module <a id="core-enums"></a>
+
+1.1.1 user_status - حالة المستخدم
+
+القيمة الوصف الاستخدام
+active المستخدم نشط ويمكنه تسجيل الدخول الحالة الطبيعية للمستخدمين النشطين
+inactive المستخدم غير نشط مؤقتاً عند تعطيل الحساب مؤقتاً
+locked الحساب مقفل لكثرة المحاولات الفاشلة بعد 5 محاولات فاشلة
+pending في انتظار تفعيل الحساب بعد التسجيل الأولي
+
+1.1.2 auth_provider - مزود المصادقة
+
+القيمة الوصف الاستخدام
+local مصادقة محلية باستخدام اسم المستخدم وكلمة المرور النظام الافتراضي
+google تسجيل الدخول عبر Google OAuth للتكامل مع Google
+microsoft تسجيل الدخول عبر Microsoft للتكامل مع Microsoft 365
+ldap مصادقة عبر LDAP/Active Directory للمؤسسات التي تستخدم AD
+
+---
+
+1.2 جداول Core Module - تفصيل كامل <a id="core-tables"></a>
+
+1.2.1 users - جدول المستخدمين
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+user_id BIGSERIAL PK المعرف الفريد للمستخدم تلقائي
+username VARCHAR(50) UK اسم المستخدم للدخول 3-50 حرف، أحرف وأرقام فقط
+email VARCHAR(100) UK البريد الإلكتروني يجب أن يكون بصيغة صحيحة
+password_hash VARCHAR(255)  كلمة المرور مشفرة تشفير bcrypt
+user_status user_status  حالة المستخدم default: pending
+auth_provider auth_provider  مزود المصادقة default: local
+provider_id VARCHAR(255)  المعرف من المزود الخارجي nullable
+email_verified BOOLEAN  هل تم التحقق من البريد default: false
+email_verified_at TIMESTAMP  تاريخ التحقق من البريد nullable
+last_login TIMESTAMP  آخر تسجيل دخول nullable
+last_login_ip INET  آخر IP تم الدخول منه nullable
+login_attempts INT  عدد المحاولات الفاشلة default: 0
+locked_until TIMESTAMP  مدة قفل الحساب nullable
+employee_id INT FK → hr.employees الموظف المرتبط nullable
+preferences JSONB  تفضيلات المستخدم default: {}
+metadata JSONB  بيانات إضافية default: {}
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → users من قام بالإنشاء nullable
+updated_by BIGINT FK → users من قام بالتحديث nullable
+version INT  رقم الإصدار default: 1
+
+💡 ملاحظات للمطور:
+
+· عند إنشاء مستخدم جديد، استخدم الدالة fn_hash_password() لتشفير كلمة المرور
+· بعد 5 محاولات فاشلة، يتم تغيير الحالة إلى locked لمدة 30 دقيقة
+· لا يمكن حذف المستخدمين نهائياً - يتم تعطيلهم فقط
+
+---
+
+1.2.2 roles - جدول الأدوار
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+role_id SERIAL PK المعرف الفريد للدور تلقائي
+role_code VARCHAR(50) UK كود الدور مثال: ADMIN, HR_MANAGER
+role_name_ar VARCHAR(100)  اسم الدور بالعربية 
+role_name_en VARCHAR(100)  اسم الدور بالإنجليزية 
+role_description TEXT  وصف الدور 
+is_system_role BOOLEAN  دور نظامي لا يمكن حذفه default: false
+sort_order INT  ترتيب العرض default: 0
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → users من قام بالإنشاء nullable
+updated_by BIGINT FK → users من قام بالتحديث nullable
+
+💡 ملاحظات للمطور:
+
+· الأدوار النظامية (is_system_role = true) لا يمكن حذفها
+· الأدوار الأساسية: ADMIN, HR_MANAGER, BRANCH_MANAGER, EMPLOYEE, VIEWER
+
+---
+
+1.2.3 app_modules - جدول وحدات التطبيق
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+module_id SERIAL PK المعرف الفريد للوحدة تلقائي
+module_code VARCHAR(50) UK كود الوحدة مثال: EMPLOYEES, BRANCHES
+module_name_ar VARCHAR(100)  اسم الوحدة بالعربية 
+module_name_en VARCHAR(100)  اسم الوحدة بالإنجليزية 
+module_description TEXT  وصف الوحدة 
+parent_module_id INT FK → app_modules الوحدة الأب nullable
+module_level INT  مستوى الوحدة default: 1
+display_order INT  ترتيب العرض default: 0
+icon VARCHAR(50)  أيقونة الوحدة مثال: people, business
+route VARCHAR(100)  مسار الوحدة مثال: /employees
+is_active BOOLEAN  هل الوحدة نشطة default: true
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → users من قام بالإنشاء nullable
+updated_by BIGINT FK → users من قام بالتحديث nullable
+
+---
+
+1.2.4 permissions - جدول الصلاحيات
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+permission_id SERIAL PK المعرف الفريد للصلاحية تلقائي
+permission_code VARCHAR(100) UK كود الصلاحية مثال: EMPLOYEES_VIEW
+permission_name_ar VARCHAR(100)  اسم الصلاحية بالعربية 
+permission_name_en VARCHAR(100)  اسم الصلاحية بالإنجليزية 
+permission_description TEXT  وصف الصلاحية 
+module_id INT FK → app_modules الوحدة المرتبطة NOT NULL
+action_type VARCHAR(20)  نوع الإجراء create, read, update, delete, export, import, approve, reject
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → users من قام بالإنشاء nullable
+updated_by BIGINT FK → users من قام بالتحديث nullable
+
+---
+
+1.2.5 user_roles - جدول ربط المستخدمين بالأدوار
+
+الحقل نوع البيانات المفتاح الوصف
+user_role_id BIGSERIAL PK المعرف الفريد للربط
+user_id BIGINT FK → users معرف المستخدم
+role_id INT FK → roles معرف الدور
+assigned_at TIMESTAMP  تاريخ التعيين
+assigned_by BIGINT FK → users من قام بالتعيين
+
+🔑 القيود:
+
+· UNIQUE(user_id, role_id) - لا يمكن تكرار نفس الدور لنفس المستخدم
+
+---
+
+1.2.6 role_permissions - جدول ربط الأدوار بالصلاحيات
+
+الحقل نوع البيانات المفتاح الوصف
+role_permission_id BIGSERIAL PK المعرف الفريد للربط
+role_id INT FK → roles معرف الدور
+permission_id INT FK → permissions معرف الصلاحية
+granted_at TIMESTAMP  تاريخ المنح
+granted_by BIGINT FK → users من قام بالمنح
+
+🔑 القيود:
+
+· UNIQUE(role_id, permission_id) - لا يمكن تكرار نفس الصلاحية لنفس الدور
+
+---
+
+1.2.7 user_sessions - جدول جلسات المستخدمين
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+session_id BIGSERIAL PK المعرف الفريد للجلسة تلقائي
+user_id BIGINT FK → users معرف المستخدم NOT NULL
+session_token VARCHAR(255) UK رمز الجلسة فريد
+refresh_token VARCHAR(255) UK رمز التحديث فريد
+ip_address INET  عنوان IP nullable
+user_agent TEXT  معلومات المتصفح nullable
+device_info JSONB  معلومات الجهاز default: {}
+login_at TIMESTAMP  وقت الدخول default: CURRENT_TIMESTAMP
+last_activity TIMESTAMP  آخر نشاط default: CURRENT_TIMESTAMP
+expires_at TIMESTAMP  وقت انتهاء الجلسة NOT NULL
+is_active BOOLEAN  هل الجلسة نشطة default: true
+
+---
+
+1.2.8 login_attempts - جدول محاولات تسجيل الدخول
+
+الحقل نوع البيانات المفتاح الوصف
+attempt_id BIGSERIAL PK المعرف الفريد للمحاولة
+username VARCHAR(50)  اسم المستخدم المحاول
+ip_address INET  عنوان IP
+attempt_time TIMESTAMP  وقت المحاولة
+success BOOLEAN  هل نجحت المحاولة
+failure_reason VARCHAR(100)  سبب الفشل
+
+---
+
+1.2.9 password_resets - جدول إعادة تعيين كلمة المرور
+
+الحقل نوع البيانات المفتاح الوصف
+reset_id BIGSERIAL PK المعرف الفريد للطلب
+user_id BIGINT FK → users معرف المستخدم
+reset_token VARCHAR(255) UK رمز إعادة التعيين
+expires_at TIMESTAMP  وقت انتهاء الصلاحية
+used BOOLEAN  هل تم استخدام الرمز
+used_at TIMESTAMP  وقت الاستخدام
+created_at TIMESTAMP  تاريخ الإنشاء
+
+---
+
+1.2.10 outbox_messages - جدول الرسائل الصادرة (Event-Driven)
+
+الحقل نوع البيانات المفتاح الوصف
+outbox_id BIGSERIAL PK المعرف الفريد للرسالة
+message_id UUID UK معرف الرسالة (UUID)
+message_type VARCHAR(255)  نوع الرسالة
+aggregate_type VARCHAR(255)  نوع الـ Aggregate
+aggregate_id BIGINT  معرف الـ Aggregate
+payload JSONB  محتوى الرسالة
+occurred_at TIMESTAMP  وقت حدوث الحدث
+processed_at TIMESTAMP  وقت المعالجة
+error TEXT  خطأ المعالجة
+retry_count INT  عدد محاولات إعادة المحاولة
+status VARCHAR(20)  حالة الرسالة
+
+---
+
+1.2.11 inbox_messages - جدول الرسائل الواردة
+
+الحقل نوع البيانات المفتاح الوصف
+inbox_id BIGSERIAL PK المعرف الفريد للرسالة
+message_id UUID UK معرف الرسالة
+message_type VARCHAR(255)  نوع الرسالة
+payload JSONB  محتوى الرسالة
+received_at TIMESTAMP  وقت الاستلام
+processed_at TIMESTAMP  وقت المعالجة
+error TEXT  خطأ المعالجة
+status VARCHAR(20)  حالة الرسالة
+
+---
+
+1.3 العروض (Views) - Core Module <a id="core-views"></a>
+
+1.3.1 v_user_permissions - عرض صلاحيات المستخدمين
+
+```sql
+-- يعرض جميع صلاحيات كل مستخدم
+SELECT * FROM core.v_user_permissions WHERE user_id = 1;
+```
+
+الحقل الوصف
+user_id معرف المستخدم
+username اسم المستخدم
+email البريد الإلكتروني
+permission_id معرف الصلاحية
+permission_code كود الصلاحية
+permission_name_ar اسم الصلاحية بالعربية
+action_type نوع الإجراء
+module_code كود الوحدة
+module_name_ar اسم الوحدة بالعربية
+
+---
+
+1.3.2 v_user_roles - عرض أدوار المستخدمين
+
+```sql
+-- يعرض جميع أدوار كل مستخدم
+SELECT * FROM core.v_user_roles WHERE user_id = 1;
+```
+
+الحقل الوصف
+user_id معرف المستخدم
+username اسم المستخدم
+email البريد الإلكتروني
+role_id معرف الدور
+role_code كود الدور
+role_name_ar اسم الدور بالعربية
+is_system_role هل هو دور نظامي
+assigned_at تاريخ التعيين
+
+---
+
+1.3.3 v_active_sessions - عرض الجلسات النشطة
+
+```sql
+-- يعرض جميع الجلسات النشطة حالياً
+SELECT * FROM core.v_active_sessions;
+```
+
+الحقل الوصف
+session_id معرف الجلسة
+user_id معرف المستخدم
+username اسم المستخدم
+email البريد الإلكتروني
+ip_address عنوان IP
+login_at وقت الدخول
+last_activity آخر نشاط
+expires_at وقت الانتهاء
+seconds_remaining الثواني المتبقية
+
+---
+
+1.4 الدوال (Functions) - Core Module <a id="core-functions"></a>
+
+1.4.1 دوال التحقق (Validation)
+
+fn_validate_email(email VARCHAR)
+
+· الوصف: التحقق من صيغة البريد الإلكتروني
+· المعطيات: email - البريد الإلكتروني
+· النتيجة: BOOLEAN - صحيح إذا كان البريد صالحاً
+· مثال:
+  ```sql
+  SELECT core.fn_validate_email('test@example.com'); -- true
+  SELECT core.fn_validate_email('invalid-email'); -- false
+  ```
+
+fn_validate_username(username VARCHAR)
+
+· الوصف: التحقق من صحة اسم المستخدم
+· المعطيات: username - اسم المستخدم
+· النتيجة: TABLE(is_valid BOOLEAN, message TEXT)
+· مثال:
+  ```sql
+  SELECT * FROM core.fn_validate_username('ahmed123');
+  ```
+
+fn_validate_password(password VARCHAR)
+
+· الوصف: التحقق من قوة كلمة المرور
+· المعطيات: password - كلمة المرور
+· النتيجة: TABLE(is_valid BOOLEAN, message TEXT, strength INT)
+· مثال:
+  ```sql
+  SELECT * FROM core.fn_validate_password('Password123!');
+  ```
+
+---
+
+1.4.2 دوال الأمان (Security)
+
+fn_hash_password(password VARCHAR)
+
+· الوصف: تشفير كلمة المرور باستخدام bcrypt
+· المعطيات: password - كلمة المرور
+· النتيجة: VARCHAR - كلمة المرور المشفرة
+· مثال:
+  ```sql
+  SELECT core.fn_hash_password('MySecret123');
+  ```
+
+fn_verify_password(password VARCHAR, hash VARCHAR)
+
+· الوصف: التحقق من تطابق كلمة المرور مع التشفير
+· المعطيات: password - كلمة المرور المدخلة، hash - التشفير المخزن
+· النتيجة: BOOLEAN
+· مثال:
+  ```sql
+  SELECT core.fn_verify_password('MySecret123', '$2a$10$...');
+  ```
+
+fn_generate_token(length INT DEFAULT 32)
+
+· الوصف: توليد رمز عشوائي
+· المعطيات: length - طول الرمز
+· النتيجة: VARCHAR
+· مثال:
+  ```sql
+  SELECT core.fn_generate_token(64); -- رمز عشوائي بطول 64 حرف
+  ```
+
+---
+
+1.5 الارتباطات مع الوحدات الأخرى <a id="core-relationships"></a>
+
+الجدول الوحدة المرتبطة نوع العلاقة الحقل المرتبط
+users.employee_id HR Module One-to-One employees.employee_id
+created_by Core Module Many-to-One users.user_id
+updated_by Core Module Many-to-One users.user_id
+
+📌 ملخص العلاقات:
+
+· مع HR Module: كل مستخدم يمكن ربطه بموظف واحد (اختياري)
+· مع جميع الوحدات: حقول created_by و updated_by موجودة في كل وحدة للإشارة إلى المستخدم الذي قام بالعملية
+
+---
+
+🏢 Organization Module - وحدة الهيكل التنظيمي
+
+2.1 الأنواع المخصصة (ENUMs) - Organization Module <a id="organization-enums"></a>
+
+2.1.1 branch_type - نوع الفرع
+
+القيمة الوصف الاستخدام
+M1 فرع رئيسي مستوى 1 أعلى مستوى في الهيكل التنظيمي
+M فرع رئيسي فروع رئيسية تحت المستوى الأول
+S فرع فرعي فروع تابعة للفروع الرئيسية
+F فرع ميداني فروع في المواقع الميدانية
+
+2.1.2 operational_status - حالة التشغيل
+
+القيمة الوصف الاستخدام
+ready جاهز الفرع جاهز للتشغيل
+active نشط الفرع يعمل حالياً
+standby احتياط الفرع في حالة احتياط
+maintenance صيانة الفرع تحت الصيانة
+
+---
+
+2.2 جداول Organization Module - تفصيل كامل <a id="organization-tables"></a>
+
+2.2.1 branch_types - جدول أنواع الفروع (Lookup)
+
+الحقل نوع البيانات المفتاح الوصف
+type_id SERIAL PK المعرف الفريد لنوع الفرع
+type_code VARCHAR(10) UK كود النوع (M1, M, S, F)
+type_name_ar VARCHAR(100)  اسم النوع بالعربية
+type_name_en VARCHAR(100)  اسم النوع بالإنجليزية
+sort_order INT  ترتيب العرض
+is_active BOOLEAN  هل النوع نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+
+---
+
+2.2.2 operational_statuses - جدول حالات التشغيل (Lookup)
+
+الحقل نوع البيانات المفتاح الوصف
+status_id SERIAL PK المعرف الفريد للحالة
+status_code VARCHAR(20) UK كود الحالة
+status_name_ar VARCHAR(100)  اسم الحالة بالعربية
+status_name_en VARCHAR(100)  اسم الحالة بالإنجليزية
+sort_order INT  ترتيب العرض
+
+---
+
+2.2.3 branches - جدول الفروع (الجدول الرئيسي)
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+branch_id SERIAL PK المعرف الفريد للفرع تلقائي
+branch_code VARCHAR(50) UK كود الفرع الفريد مثال: HQ, RIYADH-01
+branch_name_ar VARCHAR(255)  اسم الفرع بالعربية 
+branch_name_en VARCHAR(255)  اسم الفرع بالإنجليزية 
+branch_type_id INT FK → branch_types نوع الفرع 
+parent_branch_id INT FK → branches الفرع الأب nullable
+level INT  مستوى الفرع في الشجرة default: 0
+has_departments BOOLEAN  هل يحتوي على إدارات default: true
+requires_approval BOOLEAN  هل يتطلب اعتماد default: false
+position INT  ترتيب الفرع default: 0
+operational_status_id INT FK → operational_statuses حالة التشغيل default: 1
+command_level INT  مستوى القيادة default: 0
+latitude DECIMAL(10,8)  خط العرض nullable
+longitude DECIMAL(11,8)  خط الطول nullable
+address TEXT  العنوان التفصيلي nullable
+notes TEXT  ملاحظات nullable
+metadata JSONB  بيانات إضافية default: {}
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → core.users من قام بالإنشاء nullable
+updated_by BIGINT FK → core.users من قام بالتحديث nullable
+
+🔑 القيود:
+
+· CONSTRAINT chk_parent_not_self CHECK (parent_branch_id IS NULL OR parent_branch_id != branch_id)
+· CONSTRAINT chk_latitude CHECK (latitude IS NULL OR (latitude BETWEEN -90 AND 90))
+· CONSTRAINT chk_longitude CHECK (longitude IS NULL OR (longitude BETWEEN -180 AND 180))
+
+---
+
+2.2.4 branch_closure - جدول Closure للهيكل الهرمي
+
+الحقل نوع البيانات المفتاح الوصف
+ancestor INT PK, FK → branches الفرع الأب
+descendant INT PK, FK → branches الفرع الابن
+depth INT  عمق العلاقة (0 يعني نفس الفرع)
+
+🔑 القيود:
+
+· PRIMARY KEY (ancestor, descendant)
+· CONSTRAINT chk_depth_non_negative CHECK (depth >= 0)
+
+💡 ملاحظات للمطور:
+
+· هذا الجدول يسهل الاستعلام عن الشجرة الهرمية
+· مثال: للحصول على جميع الفروع التابعة للفرع رقم 5:
+  ```sql
+  SELECT descendant FROM branch_closure WHERE ancestor = 5 AND depth > 0;
+  ```
+
+---
+
+2.2.5 departments - جدول الإدارات
+
+الحقل نوع البيانات المفتاح الوصف
+department_id SERIAL PK المعرف الفريد للإدارة
+department_code VARCHAR(50) UK كود الإدارة الفريد
+department_name_ar VARCHAR(255)  اسم الإدارة بالعربية
+department_name_en VARCHAR(255)  اسم الإدارة بالإنجليزية
+description TEXT  وصف الإدارة
+is_active BOOLEAN  هل الإدارة نشطة
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+2.2.6 sections - جدول الأقسام
+
+الحقل نوع البيانات المفتاح الوصف
+section_id SERIAL PK المعرف الفريد للقسم
+section_code VARCHAR(50) UK كود القسم الفريد
+section_name_ar VARCHAR(255)  اسم القسم بالعربية
+section_name_en VARCHAR(255)  اسم القسم بالإنجليزية
+description TEXT  وصف القسم
+is_active BOOLEAN  هل القسم نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+2.2.7 branch_departments - جدول ربط الفروع بالإدارات
+
+الحقل نوع البيانات المفتاح الوصف
+branch_dept_id SERIAL PK المعرف الفريد للربط
+branch_id INT FK → branches معرف الفرع
+department_id INT FK → departments معرف الإدارة
+is_active BOOLEAN  هل الربط نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+🔑 القيود:
+
+· UNIQUE(branch_id, department_id)
+
+---
+
+2.2.8 branch_dept_sections - جدول ربط الفروع-الإدارات بالأقسام
+
+الحقل نوع البيانات المفتاح الوصف
+branch_dept_section_id SERIAL PK المعرف الفريد للربط
+branch_dept_id INT FK → branch_departments معرف ربط الفرع بالإدارة
+section_id INT FK → sections معرف القسم
+is_active BOOLEAN  هل الربط نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+🔑 القيود:
+
+· UNIQUE(branch_dept_id, section_id)
+
+---
+
+2.3 العروض (Views) - Organization Module <a id="organization-views"></a>
+
+2.3.1 v_branch_hierarchy - عرض التسلسل الهرمي للفروع
+
+```sql
+-- يعرض الشجرة الهرمية الكاملة للفروع
+SELECT * FROM organization.v_branch_hierarchy;
+```
+
+الحقل الوصف
+branch_id معرف الفرع
+branch_code كود الفرع
+branch_name_ar اسم الفرع بالعربية
+parent_branch_id معرف الفرع الأب
+level مستوى الفرع
+tree_level مستوى الشجرة
+full_path المسار الكامل (اسم الفرع ← الأب ← الجد)
+children_count عدد الفروع التابعة
+
+---
+
+2.3.2 v_branch_details - عرض تفاصيل الفروع
+
+```sql
+-- يعرض تفاصيل الفروع مع معلومات إضافية
+SELECT * FROM organization.v_branch_details;
+```
+
+الحقل الوصف
+branch_id معرف الفرع
+branch_code كود الفرع
+branch_name_ar اسم الفرع بالعربية
+branch_type نوع الفرع
+operational_status حالة التشغيل
+level مستوى الفرع
+parent_branch_name اسم الفرع الأب
+sub_branches_count عدد الفروع التابعة
+departments_count عدد الإدارات
+
+---
+
+2.4 الدوال (Functions) - Organization Module <a id="organization-functions"></a>
+
+2.4.1 دوال الهرم (Hierarchy)
+
+fn_add_branch(branch_code, branch_name_ar, branch_type_id, parent_branch_id)
+
+· الوصف: إضافة فرع جديد مع تحديث Closure Table
+· المعطيات:
+  · p_branch_code: كود الفرع
+  · p_branch_name_ar: اسم الفرع بالعربية
+  · p_branch_type_id: نوع الفرع
+  · p_parent_branch_id: الفرع الأب (اختياري)
+· النتيجة: INT - معرف الفرع الجديد
+· مثال:
+  ```sql
+  SELECT organization.fn_add_branch('RIYADH-01', 'فرع الرياض', 1, NULL);
+  ```
+
+fn_get_branch_path(branch_id, separator)
+
+· الوصف: الحصول على المسار الكامل للفرع
+· المعطيات:
+  · p_branch_id: معرف الفرع
+  · p_separator: فاصل المسار (default:  → )
+· النتيجة: TEXT - المسار الكامل
+· مثال:
+  ```sql
+  SELECT organization.fn_get_branch_path(5); -- 'المركز الرئيسي → فرع الرياض → فرع الملز'
+  ```
+
+fn_get_descendants(ancestor_id, include_self, max_depth)
+
+· الوصف: الحصول على جميع الفروع التابعة لفرع معين
+· المعطيات:
+  · p_ancestor_id: معرف الفرع الأب
+  · p_include_self: هل يشمل الفرع نفسه
+  · p_max_depth: أقصى عمق
+· النتيجة: TABLE(branch_id, branch_code, branch_name_ar, depth, level)
+· مثال:
+  ```sql
+  SELECT * FROM organization.fn_get_descendants(1, false, 3);
+  ```
+
+fn_get_ancestors(descendant_id, include_self)
+
+· الوصف: الحصول على جميع الفروع الأب لفرع معين
+· المعطيات:
+  · p_descendant_id: معرف الفرع الابن
+  · p_include_self: هل يشمل الفرع نفسه
+· النتيجة: TABLE(branch_id, branch_code, branch_name_ar, depth, level)
+
+fn_move_branch(branch_id, new_parent_id)
+
+· الوصف: نقل فرع إلى أب جديد
+· المعطيات:
+  · p_branch_id: معرف الفرع
+  · p_new_parent_id: معرف الأب الجديد
+· النتيجة: BOOLEAN
+· ملاحظة: تتحقق من عدم وجود دورة قبل النقل
+
+---
+
+2.4.2 دوال التحقق (Validation)
+
+fn_validate_branch_code(branch_code, current_branch_id)
+
+· الوصف: التحقق من صحة كود الفرع وعدم تكراره
+· المعطيات:
+  · p_branch_code: كود الفرع
+  · p_current_branch_id: معرف الفرع الحالي (للتحديث)
+· النتيجة: TABLE(is_valid BOOLEAN, message TEXT)
+
+fn_check_branch_cycle(branch_id, new_parent_id)
+
+· الوصف: التحقق من عدم وجود دورة في الشجرة الهرمية
+· المعطيات:
+  · p_branch_id: معرف الفرع
+  · p_new_parent_id: معرف الأب الجديد
+· النتيجة: TABLE(has_cycle BOOLEAN, cycle_path TEXT)
+
+---
+
+2.5 الارتباطات مع الوحدات الأخرى <a id="organization-relationships"></a>
+
+الجدول الوحدة المرتبطة نوع العلاقة الحقل المرتبط
+branches.branch_id HR Module One-to-Many employees.current_branch_id
+branches.branch_id HR Module One-to-Many employee_assignments.branch_id
+branches.branch_id Assets Module One-to-Many machines.current_branch_id
+branches.branch_id Assets Module One-to-Many machine_assignments.branch_id
+branches.branch_id Field Module One-to-Many locations.branch_id
+branches.branch_id Field Module One-to-Many tasks.branch_id
+departments.department_id HR Module One-to-Many employees.current_department_id
+sections.section_id HR Module One-to-Many employees.current_section_id
+
+📌 ملخص العلاقات:
+
+· مع HR Module: الفروع والإدارات والأقسام تستخدم في تكليفات الموظفين
+· مع Assets Module: الآلات والأدوات ترتبط بالفروع
+· مع Field Module: المواقع والمهام ترتبط بالفروع
+
+---
+
+👥 HR Module - وحدة الموارد البشرية
+
+3.1 الأنواع المخصصة (ENUMs) - HR Module <a id="hr-enums"></a>
+
+3.1.1 attendance_status - حالة الحضور
+
+القيمة الوصف الاستخدام
+present حاضر الموظف حاضر
+absent غائب الموظف غائب بدون عذر
+vacation إجازة الموظف في إجازة
+sick مريض الموظف في إجازة مرضية
+late متأخر الموظف تأخر عن الحضور
+permission إذن الموظف لديه إذن بالغياب
+
+3.1.2 training_status - حالة التدريب
+
+القيمة الوصف الاستخدام
+enrolled ملتحق الموظف مسجل في الدورة
+completed منتهي أكمل الدورة بنجاح
+failed راسب لم يجتاز الدورة
+withdrawn متوقف انسحب من الدورة
+
+3.1.3 employee_status - حالة الموظف
+
+القيمة الوصف الاستخدام
+active نشط الموظف على رأس العمل
+vacation إجازة الموظف في إجازة
+sick مريض الموظف في إجازة مرضية
+terminated منتهى الخدمة انتهت خدمة الموظف
+retired متقاعد الموظف تقاعد
+
+3.1.4 qualification_type - نوع المؤهل
+
+القيمة الوصف
+educational تعليمي
+professional مهني
+technical تقني
+certificate شهادة
+diploma دبلوم
+bachelor بكالوريوس
+master ماجستير
+doctorate دكتوراه
+training دورة تدريبية
+license رخصة
+
+---
+
+3.2 جداول HR Module - تفصيل كامل <a id="hr-tables"></a>
+
+3.2.1 employees - جدول الموظفين (الجدول الرئيسي)
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+employee_id SERIAL PK المعرف الفريد للموظف تلقائي
+employee_code VARCHAR(50) UK كود الموظف الفريد مثال: EMP001
+full_name_ar VARCHAR(255)  الاسم الكامل بالعربية 
+full_name_en VARCHAR(255)  الاسم الكامل بالإنجليزية 
+second_name VARCHAR(100)  الاسم الثاني nullable
+national_id VARCHAR(100) UK رقم الهوية الوطنية 10 أرقام
+fingerprint_id VARCHAR(100) UK رقم البصمة nullable
+job_title VARCHAR(255)  المسمى الوظيفي 
+emergency_contact VARCHAR(255)  جهة اتصال للطوارئ nullable
+phone VARCHAR(50)  رقم الهاتف nullable
+email VARCHAR(255)  البريد الإلكتروني nullable
+birth_date DATE  تاريخ الميلاد nullable
+hire_date DATE  تاريخ التعيين nullable
+reading_level_id INT FK → reading_levels مستوى القراءة nullable
+current_job_level_id INT FK → job_levels المستوى الوظيفي الحالي nullable
+current_branch_id INT FK → organization.branches الفرع الحالي nullable
+current_department_id INT FK → organization.departments الإدارة الحالية nullable
+current_section_id INT FK → organization.sections القسم الحالي nullable
+is_active BOOLEAN  هل الموظف نشط default: true
+employment_status employee_status  حالة الموظف default: active
+notes TEXT  ملاحظات nullable
+metadata JSONB  بيانات إضافية default: {}
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → core.users من قام بالإنشاء nullable
+updated_by BIGINT FK → core.users من قام بالتحديث nullable
+version INT  رقم الإصدار default: 1
+
+🔑 القيود:
+
+· CONSTRAINT chk_email_format CHECK (email IS NULL OR email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+· CONSTRAINT chk_national_id CHECK (national_id IS NULL OR national_id ~ '^[0-9]{10}$')
+· CONSTRAINT chk_birth_date CHECK (birth_date IS NULL OR birth_date <= CURRENT_DATE)
+
+---
+
+3.2.2 employee_assignments - جدول تكليفات الموظفين (تاريخي)
+
+الحقل نوع البيانات المفتاح الوصف
+assignment_id SERIAL PK المعرف الفريد للتكليف
+employee_id INT FK → employees معرف الموظف
+branch_id INT FK → organization.branches الفرع
+branch_dept_id INT FK → organization.branch_departments ربط الفرع بالإدارة
+branch_dept_section_id INT FK → organization.branch_dept_sections ربط الفرع-الإدارة بالقسم
+job_title VARCHAR(255)  المسمى الوظيفي في هذا التكليف
+is_primary BOOLEAN  هل هذا هو التكليف الأساسي
+start_date DATE  تاريخ بدء التكليف
+end_date DATE  تاريخ انتهاء التكليف
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· CONSTRAINT chk_assignment_dates CHECK (end_date IS NULL OR end_date >= start_date)
+· CONSTRAINT chk_at_least_one_assignment CHECK (branch_id IS NOT NULL OR branch_dept_id IS NOT NULL OR branch_dept_section_id IS NOT NULL)
+
+---
+
+3.2.3 qualifications - جدول المؤهلات
+
+الحقل نوع البيانات المفتاح الوصف
+qualification_id SERIAL PK المعرف الفريد للمؤهل
+qualification_code VARCHAR(50) UK كود المؤهل
+qualification_name_ar VARCHAR(255)  اسم المؤهل بالعربية
+qualification_name_en VARCHAR(255)  اسم المؤهل بالإنجليزية
+qualification_type_id INT FK → qualification_types نوع المؤهل
+description TEXT  وصف المؤهل
+is_active BOOLEAN  هل المؤهل نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+3.2.4 training_courses - جدول الدورات التدريبية
+
+الحقل نوع البيانات المفتاح الوصف
+course_id SERIAL PK المعرف الفريد للدورة
+course_code VARCHAR(50) UK كود الدورة
+course_name_ar VARCHAR(255)  اسم الدورة بالعربية
+course_name_en VARCHAR(255)  اسم الدورة بالإنجليزية
+category VARCHAR(100)  تصنيف الدورة
+duration_days INT  مدة الدورة بالأيام
+provider VARCHAR(255)  مقدم الدورة
+description TEXT  وصف الدورة
+is_active BOOLEAN  هل الدورة نشطة
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+3.2.5 reading_levels - جدول مستويات القراءة
+
+الحقل نوع البيانات المفتاح الوصف
+reading_level_id SERIAL PK المعرف الفريد للمستوى
+level_code VARCHAR(20) UK كود المستوى
+level_name_ar VARCHAR(255)  اسم المستوى بالعربية
+level_name_en VARCHAR(255)  اسم المستوى بالإنجليزية
+min_wpm INT  الحد الأدنى لسرعة القراءة
+max_wpm INT  الحد الأقصى لسرعة القراءة
+description TEXT  وصف المستوى
+created_at TIMESTAMP  تاريخ الإنشاء
+
+---
+
+3.2.6 job_levels - جدول المستويات الوظيفية
+
+الحقل نوع البيانات المفتاح الوصف
+level_id SERIAL PK المعرف الفريد للمستوى
+level_code VARCHAR(50) UK كود المستوى الوظيفي
+level_name_ar VARCHAR(255)  اسم المستوى بالعربية
+level_name_en VARCHAR(255)  اسم المستوى بالإنجليزية
+description TEXT  وصف المستوى
+sort_order INT  ترتيب العرض
+is_active BOOLEAN  هل المستوى نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+3.2.7 admin_specialties - جدول التخصصات الإدارية
+
+الحقل نوع البيانات المفتاح الوصف
+specialty_id SERIAL PK المعرف الفريد للتخصص
+specialty_code VARCHAR(50) UK كود التخصص
+specialty_name_ar VARCHAR(255)  اسم التخصص بالعربية
+specialty_name_en VARCHAR(255)  اسم التخصص بالإنجليزية
+field VARCHAR(100)  المجال (تقنية، مالية،...)
+description TEXT  وصف التخصص
+is_active BOOLEAN  هل التخصص نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+3.2.8 employee_qualifications - جدول مؤهلات الموظفين
+
+الحقل نوع البيانات المفتاح الوصف
+emp_qual_id SERIAL PK المعرف الفريد
+employee_id INT FK → employees معرف الموظف
+qualification_id INT FK → qualifications معرف المؤهل
+institution VARCHAR(255)  المؤسسة المانحة
+is_required BOOLEAN  هل المؤهل مطلوب للوظيفة
+graduation_year INT  سنة التخرج
+grade VARCHAR(50)  التقدير
+document_url TEXT  رابط الوثيقة
+verified BOOLEAN  هل تم التحقق من المؤهل
+verified_at TIMESTAMP  تاريخ التحقق
+verified_by INT FK → core.users من قام بالتحقق
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· UNIQUE(employee_id, qualification_id)
+
+---
+
+3.2.9 employee_training - جدول تدريب الموظفين
+
+الحقل نوع البيانات المفتاح الوصف
+emp_training_id SERIAL PK المعرف الفريد
+employee_id INT FK → employees معرف الموظف
+course_id INT FK → training_courses معرف الدورة
+is_required BOOLEAN  هل الدورة مطلوبة
+completion_date DATE  تاريخ الإكمال
+expiry_date DATE  تاريخ انتهاء الصلاحية
+score DECIMAL(5,2)  الدرجة
+status training_status  حالة التدريب
+certificate_url TEXT  رابط الشهادة
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· UNIQUE(employee_id, course_id)
+· CONSTRAINT chk_training_score CHECK (score BETWEEN 0 AND 100)
+
+---
+
+3.2.10 attendance - جدول الحضور الرئيسي
+
+الحقل نوع البيانات المفتاح الوصف
+attendance_id BIGSERIAL PK المعرف الفريد للحضور
+employee_id INT FK → employees معرف الموظف
+attendance_date DATE  تاريخ الحضور
+attendance_year_month INT GENERATED سنة وشهر الحضور (للأرشفة)
+check_in TIME  وقت الحضور
+check_out TIME  وقت الانصراف
+status attendance_status  حالة الحضور
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· UNIQUE(employee_id, attendance_date)
+· CONSTRAINT chk_attendance_times CHECK (check_out IS NULL OR check_out >= check_in)
+
+---
+
+3.2.11 attendance_archive - جدول أرشيف الحضور
+
+الحقل نوع البيانات المفتاح الوصف
+archive_id BIGSERIAL PK المعرف الفريد للأرشيف
+attendance_id BIGINT  المعرف الأصلي
+employee_id INT  معرف الموظف
+attendance_date DATE  تاريخ الحضور
+attendance_year_month INT  سنة وشهر الحضور
+check_in TIME  وقت الحضور
+check_out TIME  وقت الانصراف
+status attendance_status  حالة الحضور
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء الأصلي
+archived_at TIMESTAMP  تاريخ الأرشفة
+archived_by VARCHAR(100)  من قام بالأرشفة
+
+---
+
+3.3 العروض (Views) - HR Module <a id="hr-views"></a>
+
+3.3.1 v_employee_details - عرض تفاصيل الموظفين
+
+```sql
+-- يعرض تفاصيل الموظفين مع معلومات إضافية
+SELECT * FROM hr.v_employee_details WHERE employee_id = 1;
+```
+
+الحقل الوصف
+employee_id معرف الموظف
+employee_code كود الموظف
+full_name_ar الاسم الكامل
+national_id رقم الهوية
+job_title المسمى الوظيفي
+employment_status حالة الموظف
+age العمر
+years_of_service سنوات الخدمة
+reading_level مستوى القراءة
+current_branch الفرع الحالي
+current_department الإدارة الحالية
+current_section القسم الحالي
+qualifications_count عدد المؤهلات
+attendance_this_month أيام الحضور هذا الشهر
+
+---
+
+3.3.2 v_monthly_attendance - عرض ملخص الحضور الشهري
+
+```sql
+-- يعرض ملخص الحضور الشهري للموظفين
+SELECT * FROM hr.v_monthly_attendance WHERE month = '2026-03-01';
+```
+
+الحقل الوصف
+employee_id معرف الموظف
+employee_code كود الموظف
+full_name_ar الاسم
+branch_name اسم الفرع
+month الشهر
+total_days إجمالي الأيام
+present_days أيام الحضور
+absent_days أيام الغياب
+late_days أيام التأخير
+vacation_days أيام الإجازة
+sick_days أيام المرض
+total_hours إجمالي ساعات العمل
+avg_hours_per_day متوسط ساعات العمل يومياً
+
+---
+
+3.4 الدوال (Functions) - HR Module <a id="hr-functions"></a>
+
+3.4.1 دوال الحضور (Attendance)
+
+fn_calculate_attendance_hours(employee_id, from_date, to_date)
+
+· الوصف: حساب ساعات الحضور لفترة محددة
+· المعطيات:
+  · p_employee_id: معرف الموظف
+  · p_from_date: تاريخ البداية
+  · p_to_date: تاريخ النهاية
+· النتيجة: TABLE(total_days, present_days, absent_days, total_hours, avg_hours_per_day)
+· مثال:
+  ```sql
+  SELECT * FROM hr.fn_calculate_attendance_hours(1, '2026-03-01', '2026-03-31');
+  ```
+
+fn_check_attendance_conflict(employee_id, date, check_in, check_out, attendance_id)
+
+· الوصف: التحقق من عدم وجود تعارض في أوقات الحضور
+· المعطيات: معرف الموظف، التاريخ، وقت الحضور، وقت الانصراف، معرف الحضور الحالي
+· النتيجة: TABLE(has_conflict BOOLEAN, conflict_with_id BIGINT, conflict_description TEXT)
+
+fn_archive_old_attendance(cutoff_date, dry_run)
+
+· الوصف: أرشفة سجلات الحضور الأقدم من تاريخ محدد
+· المعطيات: تاريخ القطع، هل هي محاكاة فقط
+· النتيجة: TABLE(records_archived INT, message TEXT)
+
+---
+
+3.4.2 دوال التكليف (Assignment)
+
+fn_get_employee_current_assignment(employee_id, as_of_date)
+
+· الوصف: الحصول على التكليف الحالي للموظف
+· المعطيات: معرف الموظف، التاريخ (اختياري)
+· النتيجة: TABLE(assignment_id, branch_id, branch_name, department_id, department_name, job_title, is_primary)
+
+---
+
+3.4.3 دوال التحقق (Validation)
+
+fn_validate_national_id(national_id, employee_id)
+
+· الوصف: التحقق من صحة رقم الهوية وعدم تكراره
+· المعطيات: رقم الهوية، معرف الموظف الحالي (للتحديث)
+· النتيجة: TABLE(is_valid BOOLEAN, message TEXT)
+
+fn_validate_employee_code(employee_code, employee_id)
+
+· الوصف: التحقق من صحة كود الموظف وعدم تكراره
+
+fn_check_qualification_expiry(employee_id)
+
+· الوصف: التحقق من انتهاء صلاحية مؤهلات الموظف
+· النتيجة: TABLE(employee_id, employee_name, qualification_name, expiry_date, days_remaining, status)
+
+---
+
+3.5 الارتباطات مع الوحدات الأخرى <a id="hr-relationships"></a>
+
+الجدول الوحدة المرتبطة نوع العلاقة الحقل المرتبط
+employees.employee_id Core Module One-to-One users.employee_id
+employees.current_branch_id Organization Many-to-One branches.branch_id
+employees.current_department_id Organization Many-to-One departments.department_id
+employees.current_section_id Organization Many-to-One sections.section_id
+employee_assignments.branch_id Organization Many-to-One branches.branch_id
+employee_assignments.branch_dept_id Organization Many-to-One branch_departments.branch_dept_id
+employee_assignments.branch_dept_section_id Organization Many-to-One branch_dept_sections.branch_dept_section_id
+employee_assignments.employee_id Assets One-to-Many tool_assignments.employee_id
+employee_assignments.employee_id Field One-to-Many task_assignments.employee_id
+
+📌 ملخص العلاقات:
+
+· مع Core Module: كل موظف يمكن ربطه بحساب مستخدم واحد
+· مع Organization Module: الموظفون يرتبطون بالفروع والإدارات والأقسام
+· مع Assets Module: الموظفون قد تكون لديهم أدوات مكلفون بها
+· مع Field Module: الموظفون قد يكونون مكلفين بمهام ميدانية
+
+---
+
+🔧 Assets Module - وحدة الأصول والمعدات
+
+4.1 الأنواع المخصصة (ENUMs) - Assets Module <a id="assets-enums"></a>
+
+4.1.1 machine_status - حالة الآلة
+
+القيمة الوصف الاستخدام
+active نشط الآلة تعمل حالياً
+inactive معطل الآلة متوقفة عن العمل
+stored مخزن الآلة في المخزن
+maintenance صيانة الآلة تحت الصيانة
+reserved محجوز الآلة محجوزة لمهمة
+transferred منقول تم نقل الآلة لموقع آخر
+scrapped مستبعد الآلة تم إخراجها من الخدمة
+
+4.1.2 tool_status - حالة الأداة
+
+القيمة الوصف الاستخدام
+available متاح الأداة متاحة للاستخدام
+in_use مستعمل الأداة مستعملة حالياً
+maintenance صيانة الأداة تحت الصيانة
+lost مفقود الأداة مفقودة
+damaged تالف الأداة تالفة
+
+4.1.3 equipment_condition - حالة المعدات
+
+القيمة الوصف
+good جيد
+damaged تالف
+missing مفقود
+
+---
+
+4.2 جداول Assets Module - تفصيل كامل <a id="assets-tables"></a>
+
+4.2.1 machines - جدول الآلات (الجدول الرئيسي)
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+machine_id SERIAL PK المعرف الفريد للآلة تلقائي
+machine_code VARCHAR(50) UK كود الآلة الفريد مثال: MC-001
+machine_name_ar VARCHAR(255)  اسم الآلة بالعربية 
+machine_name_en VARCHAR(255)  اسم الآلة بالإنجليزية 
+machine_type_id INT FK → machine_types نوع الآلة 
+serial_number VARCHAR(255) UK الرقم التسلسلي فريد
+model VARCHAR(100)  الموديل 
+manufacturer VARCHAR(255)  الشركة المصنعة 
+manufacture_year INT  سنة الصنع 
+acquisition_date DATE  تاريخ الشراء 
+acquisition_cost DECIMAL(15,2)  تكلفة الشراء 
+current_value DECIMAL(15,2)  القيمة الحالية 
+maintenance_interval INT  فترة الصيانة (أيام) 
+last_maintenance_date DATE  تاريخ آخر صيانة 
+next_maintenance_date DATE GENERATED تاريخ الصيانة القادم محسوب
+required_employees INT  عدد الموظفين المطلوبين default: 1
+minimum_presence INT  الحد الأدنى للتواجد default: 1
+status_id INT FK → machine_statuses حالة الآلة default: 1
+current_branch_id INT FK → organization.branches الفرع الحالي nullable
+current_branch_dept_id INT FK → organization.branch_departments الإدارة الحالية nullable
+current_branch_dept_section_id INT FK → organization.branch_dept_sections القسم الحالي nullable
+notes TEXT  ملاحظات 
+metadata JSONB  بيانات إضافية default: {}
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → core.users من قام بالإنشاء 
+updated_by BIGINT FK → core.users من قام بالتحديث 
+version INT  رقم الإصدار default: 1
+
+---
+
+4.2.2 tools - جدول الأدوات
+
+الحقل نوع البيانات المفتاح الوصف
+tool_id SERIAL PK المعرف الفريد للأداة
+tool_code VARCHAR(50) UK كود الأداة الفريد
+tool_name_ar VARCHAR(255)  اسم الأداة بالعربية
+tool_name_en VARCHAR(255)  اسم الأداة بالإنجليزية
+serial_number VARCHAR(255) UK الرقم التسلسلي
+category VARCHAR(100)  التصنيف
+manufacturer VARCHAR(255)  الشركة المصنعة
+model VARCHAR(100)  الموديل
+purchase_date DATE  تاريخ الشراء
+purchase_cost DECIMAL(12,2)  تكلفة الشراء
+current_value DECIMAL(12,2)  القيمة الحالية
+warranty_expiry DATE  تاريخ انتهاء الضمان
+location_details VARCHAR(255)  موقع التخزين
+status tool_status  حالة الأداة
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+4.2.3 resources - جدول الموارد (المواد الاستهلاكية)
+
+الحقل نوع البيانات المفتاح الوصف
+resource_id SERIAL PK المعرف الفريد للمورد
+resource_code VARCHAR(100) UK كود المورد
+resource_name_ar VARCHAR(255)  اسم المورد بالعربية
+resource_name_en VARCHAR(255)  اسم المورد بالإنجليزية
+type_id INT FK → resource_types نوع المورد
+unit VARCHAR(50)  وحدة القياس
+minimum_stock DECIMAL(10,2)  الحد الأدنى للمخزون
+maximum_stock DECIMAL(10,2)  الحد الأقصى للمخزون
+current_stock DECIMAL(10,2)  الكمية الحالية
+reorder_level DECIMAL(10,2)  مستوى إعادة الطلب
+location VARCHAR(255)  موقع التخزين
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+4.2.4 machine_assignments - جدول تكليفات الآلات
+
+الحقل نوع البيانات المفتاح الوصف
+assignment_id SERIAL PK المعرف الفريد للتكليف
+machine_id INT FK → machines معرف الآلة
+branch_id INT FK → organization.branches الفرع
+branch_dept_id INT FK → organization.branch_departments الإدارة
+branch_dept_section_id INT FK → organization.branch_dept_sections القسم
+assigned_date DATE  تاريخ التكليف
+removed_date DATE  تاريخ الإزالة
+assigned_by INT FK → core.users من قام بالت
+🔧 Assets Module - وحدة الأصول والمعدات (تابع)
+
+4.2.4 machine_assignments - جدول تكليفات الآلات (تابع)
+
+الحقل نوع البيانات المفتاح الوصف
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· CONSTRAINT chk_assignment_dates CHECK (removed_date IS NULL OR removed_date >= assigned_date)
+· CONSTRAINT chk_machine_assignment CHECK (branch_id IS NOT NULL OR branch_dept_id IS NOT NULL OR branch_dept_section_id IS NOT NULL)
+
+---
+
+4.2.5 tool_assignments - جدول تكليفات الأدوات
+
+الحقل نوع البيانات المفتاح الوصف
+assignment_id SERIAL PK المعرف الفريد للتكليف
+tool_id INT FK → tools معرف الأداة
+employee_id INT FK → hr.employees الموظف المستلم (إذا كان التكليف لموظف)
+branch_id INT FK → organization.branches الفرع المستلم (إذا كان التكليف لفرع)
+assigned_by INT FK → core.users من قام بالتسليم
+assigned_date DATE  تاريخ التسليم
+expected_return_date DATE  تاريخ الإرجاع المتوقع
+actual_return_date DATE  تاريخ الإرجاع الفعلي
+condition_on_return equipment_condition  حالة الأداة عند الإرجاع
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+
+🔑 القيود:
+
+· CONSTRAINT chk_assigned_to CHECK ((employee_id IS NOT NULL AND branch_id IS NULL) OR (employee_id IS NULL AND branch_id IS NOT NULL))
+· CONSTRAINT chk_return_dates CHECK (actual_return_date IS NULL OR actual_return_date >= assigned_date)
+
+---
+
+4.2.6 machine_resources - جدول ربط الآلات بالموارد
+
+الحقل نوع البيانات المفتاح الوصف
+machine_resource_id SERIAL PK المعرف الفريد للربط
+machine_id INT FK → machines معرف الآلة
+resource_id INT FK → resources معرف المورد
+quantity DECIMAL(10,2)  الكمية الحالية
+required_quantity DECIMAL(10,2)  الكمية المطلوبة
+unit VARCHAR(50)  وحدة القياس
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· UNIQUE(machine_id, resource_id)
+· CONSTRAINT chk_quantity_positive CHECK (quantity >= 0)
+· CONSTRAINT chk_required_positive CHECK (required_quantity >= 0)
+
+---
+
+4.2.7 objectives - جدول الأهداف
+
+الحقل نوع البيانات المفتاح الوصف
+objective_id SERIAL PK المعرف الفريد للهدف
+objective_code VARCHAR(50) UK كود الهدف
+objective_name_ar VARCHAR(255)  اسم الهدف بالعربية
+objective_name_en VARCHAR(255)  اسم الهدف بالإنجليزية
+objective_type VARCHAR(100)  نوع الهدف (إنتاجي، جودة، ...)
+description TEXT  وصف الهدف
+target_value DECIMAL(12,2)  القيمة المستهدفة
+unit VARCHAR(50)  وحدة القياس
+period_type VARCHAR(20)  نوع الفترة (daily, weekly, monthly, quarterly, yearly)
+start_date DATE  تاريخ البداية
+end_date DATE  تاريخ النهاية
+is_active BOOLEAN  هل الهدف نشط
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+4.2.8 machine_objectives - جدول أهداف الآلات
+
+الحقل نوع البيانات المفتاح الوصف
+mo_id SERIAL PK المعرف الفريد
+machine_id INT FK → machines معرف الآلة
+objective_id INT FK → objectives معرف الهدف
+actual_value DECIMAL(12,2)  القيمة الفعلية المحققة
+achievement_rate DECIMAL(6,2)  نسبة الإنجاز
+measurement_date DATE  تاريخ القياس
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+🔑 القيود:
+
+· UNIQUE(machine_id, objective_id, measurement_date)
+· CONSTRAINT chk_achievement_rate CHECK (achievement_rate BETWEEN 0 AND 100)
+
+---
+
+4.2.9 communication_devices - جدول أجهزة الاتصال
+
+الحقل نوع البيانات المفتاح الوصف
+device_id SERIAL PK المعرف الفريد للجهاز
+device_code VARCHAR(50) UK كود الجهاز
+device_name_ar VARCHAR(255)  اسم الجهاز بالعربية
+device_name_en VARCHAR(255)  اسم الجهاز بالإنجليزية
+serial_number VARCHAR(100) UK الرقم التسلسلي
+type_id INT FK → device_types نوع الجهاز
+machine_id INT FK → machines الآلة المرتبطة (اختياري)
+employee_id INT FK → hr.employees الموظف المرتبط (اختياري)
+status VARCHAR(20)  حالة الجهاز (active, inactive, maintenance, lost)
+condition equipment_condition  حالة الجهاز
+purchase_date DATE  تاريخ الشراء
+warranty_expiry DATE  تاريخ انتهاء الضمان
+last_maintenance_date DATE  تاريخ آخر صيانة
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+4.2.10 maintenance_records - جدول سجلات الصيانة
+
+الحقل نوع البيانات المفتاح الوصف
+record_id SERIAL PK المعرف الفريد لسجل الصيانة
+asset_type VARCHAR(20)  نوع الأصل ('machine', 'tool', 'device')
+asset_id INT  معرف الأصل
+maintenance_date DATE  تاريخ الصيانة
+maintenance_type VARCHAR(50)  نوع الصيانة (preventive, corrective, emergency)
+description TEXT  وصف الصيانة
+cost DECIMAL(12,2)  تكلفة الصيانة
+performed_by VARCHAR(255)  من قام بالصيانة
+next_maintenance_date DATE  تاريخ الصيانة القادمة
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+---
+
+4.3 العروض (Views) - Assets Module <a id="assets-views"></a>
+
+4.3.1 v_machine_status - عرض حالة الآلات
+
+```sql
+-- يعرض حالة الآلات النشطة ومواعيد الصيانة
+SELECT * FROM assets.v_machine_status;
+```
+
+الحقل الوصف
+machine_id معرف الآلة
+machine_code كود الآلة
+machine_name_ar اسم الآلة
+machine_type نوع الآلة
+current_status الحالة الحالية
+last_maintenance_date تاريخ آخر صيانة
+next_maintenance_date تاريخ الصيانة القادم
+maintenance_status حالة الصيانة (متأخرة، خلال أسبوع، خلال شهر، مجدولة)
+current_location الموقع الحالي
+active_assignments عدد التكليفات النشطة
+
+---
+
+4.3.2 v_tool_availability - عرض توفر الأدوات
+
+```sql
+-- يعرض توفر الأدوات والتكليفات الحالية
+SELECT * FROM assets.v_tool_availability;
+```
+
+الحقل الوصف
+tool_id معرف الأداة
+tool_code كود الأداة
+tool_name_ar اسم الأداة
+status الحالة
+status_text نص الحالة بالعربية
+assigned_to الجهة المستلمة (موظف أو فرع)
+assigned_date تاريخ التسليم
+expected_return_date تاريخ الإرجاع المتوقع
+warranty_expiry تاريخ انتهاء الضمان
+
+---
+
+4.3.3 v_resource_inventory - عرض مخزون الموارد
+
+```sql
+-- يعرض حالة مخزون الموارد
+SELECT * FROM assets.v_resource_inventory;
+```
+
+الحقل الوصف
+resource_id معرف المورد
+resource_code كود المورد
+resource_name_ar اسم المورد
+resource_type نوع المورد
+unit وحدة القياس
+current_stock الكمية الحالية
+minimum_stock الحد الأدنى
+maximum_stock الحد الأقصى
+stock_status حالة المخزون (نفذ، أقل من حد الطلب، طبيعي)
+suggested_order_quantity الكمية المقترحة للطلب
+last_updated آخر تحديث
+
+---
+
+4.4 الدوال (Functions) - Assets Module <a id="assets-functions"></a>
+
+4.4.1 دوال الصيانة (Maintenance)
+
+fn_calculate_next_maintenance(machine_id)
+
+· الوصف: حساب تاريخ الصيانة القادم للآلة
+· المعطيات: p_machine_id - معرف الآلة
+· النتيجة: DATE - تاريخ الصيانة القادم
+· مثال:
+  ```sql
+  SELECT assets.fn_calculate_next_maintenance(5);
+  ```
+
+fn_check_maintenance_due(days_ahead)
+
+· الوصف: التحقق من الآلات المستحقة للصيانة
+· المعطيات: p_days_ahead - عدد الأيام القادمة
+· النتيجة: TABLE(machine_id, machine_code, machine_name_ar, last_maintenance_date, next_maintenance_date, days_until_due, priority)
+· مثال:
+  ```sql
+  SELECT * FROM assets.fn_check_maintenance_due(30);
+  ```
+
+---
+
+4.4.2 دوال التوفر (Availability)
+
+fn_check_tool_availability(tool_id, check_date)
+
+· الوصف: التحقق من توفر الأداة
+· المعطيات: p_tool_id - معرف الأداة، p_check_date - تاريخ التحقق
+· النتيجة: TABLE(is_available BOOLEAN, current_status tool_status, assigned_to TEXT, expected_return_date DATE, message TEXT)
+· مثال:
+  ```sql
+  SELECT * FROM assets.fn_check_tool_availability(10);
+  ```
+
+fn_get_machine_resources(machine_id)
+
+· الوصف: الحصول على موارد الآلة والتحقق من كفايتها
+· المعطيات: p_machine_id - معرف الآلة
+· النتيجة: TABLE(resource_id, resource_code, resource_name_ar, required_quantity, current_quantity, unit, is_sufficient, shortage)
+
+---
+
+4.4.3 دوال التحقق (Validation)
+
+fn_validate_machine_code(machine_code, machine_id)
+
+· الوصف: التحقق من صحة كود الآلة وعدم تكراره
+
+fn_validate_serial_number(serial_number, asset_type, asset_id)
+
+· الوصف: التحقق من صحة الرقم التسلسلي حسب نوع الأصل
+
+---
+
+4.5 الارتباطات مع الوحدات الأخرى <a id="assets-relationships"></a>
+
+الجدول الوحدة المرتبطة نوع العلاقة الحقل المرتبط
+machines.current_branch_id Organization Many-to-One branches.branch_id
+machines.current_branch_dept_id Organization Many-to-One branch_departments.branch_dept_id
+machine_assignments.branch_id Organization Many-to-One branches.branch_id
+tool_assignments.employee_id HR Many-to-One employees.employee_id
+tool_assignments.branch_id Organization Many-to-One branches.branch_id
+communication_devices.machine_id Assets Many-to-One machines.machine_id
+communication_devices.employee_id HR Many-to-One employees.employee_id
+
+---
+
+🗺️ Field Module - وحدة المواقع الميدانية
+
+5.1 الأنواع المخصصة (ENUMs) - Field Module <a id="field-enums"></a>
+
+5.1.1 site_type - نوع الموقع
+
+القيمة الوصف
+drilling موقع حفر
+sampling منطقة أخذ عينات
+camp مخيم عمل
+warehouse مستودع معدات
+exploration منطقة استكشاف
+production موقع إنتاج
+laboratory معمل
+office مكتب ميداني
+helipad مهبط طائرات
+storage منطقة تخزين
+maintenance ورشة صيانة
+quarters سكن
+
+5.1.2 terrain_type - نوع التضاريس
+
+القيمة الوصف
+mountainous جبلي
+coastal ساحلي
+desert صحراوي
+urban حضري
+rural ريفي
+forest غابي
+plain سهلي
+valley وادي
+plateau هضبة
+volcanic بركاني
+wetland أرض رطبة
+arctic قطبي
+
+5.1.3 exploration_phase - مرحلة الاستكشاف
+
+القيمة الوصف
+initial مسح أولي
+reconnaissance استطلاع
+geophysical مسح جيوفيزيائي
+geochemical مسح جيوكيميائي
+exploratory حفر استكشافي
+detailed تقييم مفصل
+feasibility دراسة جدوى
+development تطوير
+production إنتاج
+closure إغلاق
+rehabilitation تأهيل
+
+5.1.4 location_status - حالة الموقع
+
+القيمة الوصف
+safe آمن
+contested متنازع عليه
+dangerous خطير
+unstable غير مستقر
+restricted مقيد
+closed مغلق
+
+5.1.5 task_status - حالة المهمة
+
+القيمة الوصف
+scheduled مجدول
+in_progress قيد التنفيذ
+completed منتهي
+cancelled ملغى
+on_hold معلق
+failed فاشل
+
+5.1.6 task_priority - أولوية المهمة
+
+القيمة الوصف
+low منخفض
+medium متوسط
+high عالي
+critical حرج
+
+---
+
+5.2 جداول Field Module - تفصيل كامل <a id="field-tables"></a>
+
+5.2.1 locations - جدول المواقع (الجدول الرئيسي)
+
+الحقل نوع البيانات المفتاح الوصف القيم المسموحة/الافتراضية
+location_id SERIAL PK المعرف الفريد للموقع تلقائي
+location_code VARCHAR(50) UK كود الموقع الفريد مثال: LOC-001
+location_name_ar VARCHAR(255)  اسم الموقع بالعربية 
+location_name_en VARCHAR(255)  اسم الموقع بالإنجليزية 
+site_type_id INT FK → site_types نوع الموقع 
+terrain_type_id INT FK → terrain_types نوع التضاريس 
+exploration_phase_id INT FK → exploration_phases مرحلة الاستكشاف default: 1
+branch_id INT FK → organization.branches الفرع المسؤول nullable
+coordinates GEOMETRY(POINT, 4326)  الإحداثيات الجغرافية PostGIS
+latitude DECIMAL(10,8) GENERATED خط العرض محسوب من coordinates
+longitude DECIMAL(11,8) GENERATED خط الطول محسوب من coordinates
+elevation DECIMAL(8,2)  الارتفاع عن سطح البحر nullable
+area_size DECIMAL(10,2)  المساحة (كم²) nullable
+capacity INT  السعة الاستيعابية nullable
+address TEXT  العنوان التفصيلي nullable
+country VARCHAR(100)  الدولة nullable
+region VARCHAR(100)  المنطقة nullable
+city VARCHAR(100)  المدينة nullable
+status location_status  حالة الموقع default: safe
+mineral_potential VARCHAR(20)  الإمكانات المعدنية default: unknown
+description TEXT  وصف الموقع nullable
+notes TEXT  ملاحظات nullable
+metadata JSONB  بيانات إضافية default: {}
+created_at TIMESTAMP  تاريخ الإنشاء default: CURRENT_TIMESTAMP
+updated_at TIMESTAMP  آخر تحديث default: CURRENT_TIMESTAMP
+created_by BIGINT FK → core.users من قام بالإنشاء nullable
+updated_by BIGINT FK → core.users من قام بالتحديث nullable
+version INT  رقم الإصدار default: 1
+
+---
+
+5.2.2 geological_sites - جدول المواقع الجيولوجية
+
+الحقل نوع البيانات المفتاح الوصف
+site_id SERIAL PK المعرف الفريد للموقع الجيولوجي
+site_code VARCHAR(50) UK كود الموقع الجيولوجي
+site_name_ar VARCHAR(255)  اسم الموقع بالعربية
+site_name_en VARCHAR(255)  اسم الموقع بالإنجليزية
+location_id INT FK → locations الموقع المرتبط
+area_size DECIMAL(10,2)  المساحة (كم²)
+geological_features TEXT  الخصائص الجيولوجية
+mineral_deposits TEXT  الرواسب المعدنية
+estimated_reserves DECIMAL(15,2)  الاحتياطيات المقدرة
+reserve_unit VARCHAR(50)  وحدة قياس الاحتياطيات
+exploration_status VARCHAR(20)  حالة الاستكشاف
+discovered_date DATE  تاريخ الاكتشاف
+estimated_value DECIMAL(15,2)  القيمة التقديرية
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+5.2.3 exploration_materials - جدول مواد الاستكشاف
+
+الحقل نوع البيانات المفتاح الوصف
+material_id SERIAL PK المعرف الفريد للمادة
+material_type VARCHAR(50)  نوع المادة
+material_code VARCHAR(50) UK كود المادة
+material_name_ar VARCHAR(255)  اسم المادة بالعربية
+material_name_en VARCHAR(255)  اسم المادة بالإنجليزية
+specifications TEXT  المواصفات
+quantity DECIMAL(10,2)  الكمية المتوفرة
+unit VARCHAR(50)  وحدة القياس
+branch_id INT FK → organization.branches الفرع المسؤول
+location_id INT FK → locations الموقع الحالي
+reorder_level DECIMAL(10,2)  مستوى إعادة الطلب
+last_restock_date DATE  تاريخ آخر توريد
+expiry_date DATE  تاريخ انتهاء الصلاحية
+supplier VARCHAR(255)  المورد
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+5.2.4 tasks - جدول المهام
+
+الحقل نوع البيانات المفتاح الوصف
+task_id SERIAL PK المعرف الفريد للمهمة
+task_code VARCHAR(50) UK كود المهمة
+task_name_ar VARCHAR(255)  اسم المهمة بالعربية
+task_name_en VARCHAR(255)  اسم المهمة بالإنجليزية
+branch_id INT FK → organization.branches الفرع المسؤول
+location_id INT FK → locations الموقع المرتبط
+description TEXT  وصف المهمة
+start_date DATE  تاريخ البدء
+end_date DATE  تاريخ الانتهاء
+status task_status  حالة المهمة
+priority task_priority  الأولوية
+estimated_duration_hours DECIMAL(8,2)  المدة التقديرية (ساعات)
+actual_duration_hours DECIMAL(8,2)  المدة الفعلية (ساعات)
+completion_percentage INT  نسبة الإنجاز
+results TEXT  نتائج المهمة
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by BIGINT FK → core.users من قام بالإنشاء
+updated_by BIGINT FK → core.users من قام بالتحديث
+
+---
+
+5.2.5 task_assignments - جدول تكليفات المهام
+
+الحقل نوع البيانات المفتاح الوصف
+assignment_id SERIAL PK المعرف الفريد للتكليف
+task_id INT FK → tasks معرف المهمة
+employee_id INT FK → hr.employees الموظف المنفذ
+machine_id INT FK → assets.machines الآلة المنفذة
+branch_id INT FK → organization.branches الفرع المنفذ
+branch_dept_id INT FK → organization.branch_departments الإدارة المنفذة
+branch_dept_section_id INT FK → organization.branch_dept_sections القسم المنفذ
+role VARCHAR(255)  الدور في المهمة
+responsibilities TEXT  المسؤوليات
+start_date DATE  تاريخ البدء
+end_date DATE  تاريخ الانتهاء
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+---
+
+5.2.6 task_dependencies - جدول تبعيات المهام
+
+الحقل نوع البيانات المفتاح الوصف
+dependency_id SERIAL PK المعرف الفريد للتبعية
+task_id INT FK → tasks المهمة التابعة
+depends_on_task_id INT FK → tasks المهمة التي تعتمد عليها
+dependency_type VARCHAR(20)  نوع التبعية
+created_at TIMESTAMP  تاريخ الإنشاء
+created_by BIGINT FK → core.users من قام بالإنشاء
+
+---
+
+5.3 العروض (Views) - Field Module <a id="field-views"></a>
+
+5.3.1 v_location_details - عرض تفاصيل المواقع
+
+```sql
+-- يعرض تفاصيل المواقع مع معلومات إضافية
+SELECT * FROM field.v_location_details;
+```
+
+الحقل الوصف
+location_id معرف الموقع
+location_code كود الموقع
+location_name_ar اسم الموقع
+site_type نوع الموقع
+terrain_type نوع التضاريس
+exploration_phase مرحلة الاستكشاف
+responsible_branch الفرع المسؤول
+latitude خط العرض
+longitude خط الطول
+status حالة الموقع
+geological_sites_count عدد المواقع الجيولوجية
+facilities_count عدد المنشآت
+active_tasks_count عدد المهام النشطة
+
+---
+
+5.3.2 v_active_tasks - عرض المهام النشطة
+
+```sql
+-- يعرض المهام النشطة (قيد التنفيذ والمجدولة)
+SELECT * FROM field.v_active_tasks;
+```
+
+الحقل الوصف
+task_id معرف المهمة
+task_code كود المهمة
+task_name_ar اسم المهمة
+location الموقع
+status الحالة
+priority الأولوية
+start_date تاريخ البدء
+end_date تاريخ الانتهاء
+completion_percentage نسبة الإنجاز
+deadline_status حالة الموعد النهائي
+assignees_count عدد المنفذين
+
+---
+
+5.4 الدوال (Functions) - Field Module <a id="field-functions"></a>
+
+5.4.1 دوال جغرافية (Geo)
+
+fn_calculate_distance(lat1, lon1, lat2, lon2, unit)
+
+· الوصف: حساب المسافة بين نقطتين جغرافيتين
+· المعطيات: إحداثيات النقطتين، وحدة القياس ('km', 'm', 'miles')
+· النتيجة: DECIMAL - المسافة
+· مثال:
+  ```sql
+  SELECT field.fn_calculate_distance(24.7136, 46.6753, 21.5433, 39.1728, 'km');
+  ```
+
+fn_get_sites_in_radius(lat, lng, radius_km, site_type_id, min_elevation, max_elevation)
+
+· الوصف: البحث عن المواقع ضمن نصف قطر محدد
+· المعطيات: إحداثيات المركز، نصف القطر، نوع الموقع (اختياري)، مدى الارتفاع (اختياري)
+· النتيجة: TABLE(location_id, location_code, location_name_ar, distance_km, site_type_name, elevation, status)
+
+fn_validate_coordinates(latitude, longitude)
+
+· الوصف: التحقق من صحة الإحداثيات الجغرافية
+
+---
+
+5.4.2 دوال السعة (Capacity)
+
+fn_check_location_capacity(location_id, check_date)
+
+· الوصف: التحقق من سعة الموقع والإشغال الحالي
+· النتيجة: TABLE(current_occupancy, max_capacity, available_spots, is_available, utilization_percentage)
+
+---
+
+5.4.3 دوال التحقق (Validation)
+
+fn_validate_location_code(location_code, location_id)
+
+· الوصف: التحقق من صحة كود الموقع وعدم تكراره
+
+fn_check_task_dates(start_date, end_date, task_id)
+
+· الوصف: التحقق من صحة تواريخ المهمة
+
+fn_check_resource_availability(location_id, resource_type)
+
+· الوصف: التحقق من توفر الموارد في موقع معين
+
+---
+
+5.5 الارتباطات مع الوحدات الأخرى <a id="field-relationships"></a>
+
+الجدول الوحدة المرتبطة نوع العلاقة الحقل المرتبط
+locations.branch_id Organization Many-to-One branches.branch_id
+tasks.branch_id Organization Many-to-One branches.branch_id
+tasks.location_id Field Many-to-One locations.location_id
+task_assignments.employee_id HR Many-to-One employees.employee_id
+task_assignments.machine_id Assets Many-to-One machines.machine_id
+exploration_materials.branch_id Organization Many-to-One branches.branch_id
+exploration_materials.location_id Field Many-to-One locations.location_id
+
+---
+
+📝 Audit Module - وحدة التدقيق المركزي
+
+6.1 جداول Audit Module <a id="audit-tables"></a>
+
+6.1.1 audit_log - جدول سجل التدقيق المركزي
+
+الحقل نوع البيانات المفتاح الوصف
+audit_id BIGSERIAL PK المعرف الفريد لسجل التدقيق
+schema_name VARCHAR(100)  اسم الـ schema
+table_name VARCHAR(100)  اسم الجدول
+record_id BIGINT  معرف السجل في الجدول الأصلي
+operation VARCHAR(10)  نوع العملية (INSERT, UPDATE, DELETE)
+old_data JSONB  البيانات القديمة (قبل التغيير)
+new_data JSONB  البيانات الجديدة (بعد التغيير)
+changed_by VARCHAR(100)  اسم المستخدم الذي قام بالتغيير
+changed_at TIMESTAMP  وقت التغيير
+ip_address INET  عنوان IP
+user_agent TEXT  معلومات المتصفح
+application_name VARCHAR(100)  اسم التطبيق
+session_id VARCHAR(100)  معرف الجلسة
+transaction_id VARCHAR(100)  معرف المعاملة
+
+---
+
+6.1.2 audit_config - جدول تكوين التدقيق
+
+الحقل نوع البيانات المفتاح الوصف
+config_id SERIAL PK المعرف الفريد للتكوين
+schema_name VARCHAR(100)  اسم الـ schema
+table_name VARCHAR(100)  اسم الجدول
+is_audited BOOLEAN  هل يتم تدقيق الجدول
+audit_insert BOOLEAN  تدقيق عمليات الإدراج
+audit_update BOOLEAN  تدقيق عمليات التحديث
+audit_delete BOOLEAN  تدقيق عمليات الحذف
+audit_select BOOLEAN  تدقيق عمليات القراءة (اختياري)
+exclude_columns TEXT[]  الأعمدة المستثناة من التدقيق
+include_columns TEXT[]  الأعمدة المحددة للتدقيق
+retention_days INT  فترة الاحتفاظ بالسجلات
+notes TEXT  ملاحظات
+created_at TIMESTAMP  تاريخ الإنشاء
+updated_at TIMESTAMP  آخر تحديث
+created_by VARCHAR(100)  من قام بالإنشاء
+updated_by VARCHAR(100)  من قام بالتحديث
+
+---
+
+6.1.3 audit_summary - جدول ملخص التدقيق
+
+الحقل نوع البيانات المفتاح الوصف
+summary_id SERIAL PK المعرف الفريد للملخص
+summary_date DATE  تاريخ الملخص
+schema_name VARCHAR(100)  اسم الـ schema
+table_name VARCHAR(100)  اسم الجدول
+insert_count INT  عدد عمليات الإدراج
+update_count INT  عدد عمليات التحديث
+delete_count INT  عدد عمليات الحذف
+total_changes INT  إجمالي التغييرات
+unique_users INT  عدد المستخدمين الفريدين
+created_at TIMESTAMP  تاريخ الإنشاء
+
+---
+
+6.2 الدوال (Functions) - Audit Module <a id="audit-functions"></a>
+
+6.2.1 دوال الاستعلام
+
+audit.get_audit_trail(schema_name, table_name, record_id, from_date, to_date, limit)
+
+· الوصف: الحصول على سجل تغييرات كائن معين
+· النتيجة: TABLE(change_id, change_date, operation, changed_by, old_data, new_data, ip_address, transaction_id)
+
+audit.get_user_audit_trail(username, from_date, to_date, limit)
+
+· الوصف: الحصول على سجل تغييرات مستخدم معين
+
+audit.get_audit_statistics(from_date, to_date, schema_name)
+
+· الوصف: الحصول على إحصائيات التدقيق لفترة محددة
+
+---
+
+6.2.2 دوال الصيانة
+
+audit.cleanup_old_audit_logs(days_to_keep, dry_run)
+
+· الوصف: تنظيف سجلات التدقيق الأقدم من عدد الأيام المحدد
+· النتيجة: TABLE(records_deleted, date_from, date_to, freed_space_mb)
+
+audit.update_daily_summary(summary_date)
+
+· الوصف: تحديث ملخص التدقيق اليومي
+
+---
+
+7. خريطة العلاقات الكاملة بين الوحدات
+
+```mermaid
+graph TD
+    Core[Core Module<br/>المستخدمين والصلاحيات] --> Org[Organization Module<br/>الفروع والإدارات]
+    Core --> HR[HR Module<br/>الموظفين والحضور]
+    Core --> Assets[Assets Module<br/>الآلات والأدوات]
+    Core --> Field[Field Module<br/>المواقع والمهام]
+    
+    Org --> HR
+    Org --> Assets
+    Org --> Field
+    
+    HR --> Assets
+    HR --> Field
+    
+    Assets --> Field
+    
+    Audit -.->|يتتبع| Core
+    Audit -.->|يتتبع| Org
+    Audit -.->|يتتبع| HR
+    Audit -.->|يتتبع| Assets
+    Audit -.->|يتتبع| Field
+```
+
+---
+
+8. إحصائيات شاملة لقاعدة البيانات
+
+الوحدة الجداول الأنواع العروض الدوال العلاقات
+Core 12 2 5 9 4
+Organization 11 2 4 7 8
+HR 17 4 4 7 9
+Assets 16 3 4 6 7
+Field 15 6 5 7 6
+Audit 3 0 0 5 0
+الإجمالي 74 17 22 41 34
+
+---
+
+9. ملخص للمطورين - كيف تبدأ في تطوير وحدة معينة
+
+لتطوير Core Module:
+
+1. ابدأ بفهم users و roles و permissions
+2. استخدم دوال التشفير fn_hash_password() و fn_verify_password()
+3. تحقق من الصلاحيات باستخدام العرض v_user_permissions
+4. تعامل مع الجلسات عبر user_sessions
+
+لتطوير HR Module:
+
+1. ابدأ بجدول employees - هذا هو قلب الوحدة
+2. استخدم دوال الحضور fn_calculate_attendance_hours()
+3. تابع تكليفات الموظفين في employee_assignments
+4. استخدم v_employee_details للحصول على معلومات شاملة
+
+لتطوير Organization Module:
+
+1. ابدأ بجدول branches وفهم branch_closure
+2. استخدم دوال الهرم fn_get_descendants() و fn_get_ancestors()
+3. تابع العلاقات مع branch_departments و branch_dept_sections
+
+---
+
+10. خاتمة
+
+هذا القاموس الشامل يغطي جميع جوانب قاعدة البيانات Project DB System. كل وحدة مصممة لتكون مستقلة بدرجة كافية تسمح لمطور واحد بتطويرها بشكل كامل، مع الحفاظ على التكامل مع الوحدات الأخرى من خلال العلاقات المحددة بوضوح.
+
+📌 نقاط القوة في التصميم:
+
+· ✅ فصل واضح للمسؤوليات بين الوحدات
+· ✅ توثيق كامل لجميع الحقول والعلاقات
+· ✅ دوال مساعدة لتسهيل الاستعلامات المعقدة
+· ✅ عروض (Views) جاهزة للاستخدام المباشر
+· ✅ نظام تدقيق شامل لجميع التغييرات
+
+تاريخ الإصدار: 2026-03-10
+إعداد: فريق تطوير Project DB System
